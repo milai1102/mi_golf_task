@@ -1,0 +1,61 @@
+﻿date,course,layout,tee,seq,hole,par,hole_strokes,putts,putts_source,penalties,fairway,hole_length_m,shot_no,club,shot_type,start_lie,end_lie,distance_m,to_pin_start_m,to_pin_end_m,garmin_scorecard_id
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ South Left+Chang Gung Golf Club ~ North Right,White,1,1,5,9,3,estimated,,HIT,473,1,一號木桿,TEE,TeeBox,Fairway,163,473,310,351845581
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ South Left+Chang Gung Golf Club ~ North Right,White,1,1,5,9,3,estimated,,HIT,473,2,鐵木桿,LAYUP,Fairway,Fairway,126,310,184,351845581
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ South Left+Chang Gung Golf Club ~ North Right,White,1,1,5,9,3,estimated,,HIT,473,3,鐵木桿,UNKNOWN,Fairway,Rough,126,184,59,351845581
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ South Left+Chang Gung Golf Club ~ North Right,White,1,1,5,9,3,estimated,,HIT,473,4,54度,UNKNOWN,Rough,Fairway,20,59,40,351845581
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ South Left+Chang Gung Golf Club ~ North Right,White,1,1,5,9,3,estimated,,HIT,473,5,A杆,UNKNOWN,Fairway,Green,40,40,0,351845581
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ South Left+Chang Gung Golf Club ~ North Right,White,2,2,5,6,2,estimated,,HIT,420,1,一號木桿,TEE,TeeBox,Fairway,152,420,270,351845581
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ South Left+Chang Gung Golf Club ~ North Right,White,2,2,5,6,2,estimated,,HIT,420,2,鐵木桿,LAYUP,Fairway,Fairway,123,270,147,351845581
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ South Left+Chang Gung Golf Club ~ North Right,White,2,2,5,6,2,estimated,,HIT,420,3,鐵木桿,APPROACH,Fairway,Fairway,112,147,36,351845581
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ South Left+Chang Gung Golf Club ~ North Right,White,2,2,5,6,2,estimated,,HIT,420,4,54度,CHIP,Fairway,Green,27,36,12,351845581
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ South Left+Chang Gung Golf Club ~ North Right,White,3,3,4,7,3,estimated,,RIGHT,347,1,一號木桿,TEE,TeeBox,Rough,159,347,215,351845581
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ South Left+Chang Gung Golf Club ~ North Right,White,3,3,4,7,3,estimated,,RIGHT,347,2,鐵木桿,LAYUP,Rough,Fairway,111,215,104,351845581
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ South Left+Chang Gung Golf Club ~ North Right,White,3,3,4,7,3,estimated,,RIGHT,347,3,8鐵,APPROACH,Fairway,Fairway,85,104,20,351845581
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ South Left+Chang Gung Golf Club ~ North Right,White,3,3,4,7,3,estimated,,RIGHT,347,4,54度,CHIP,Fairway,Green,21,20,6,351845581
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ South Left+Chang Gung Golf Club ~ North Right,White,4,4,3,5,3,estimated,,,145,1,鐵木桿,APPROACH,TeeBox,Fairway,116,145,36,351845581
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ South Left+Chang Gung Golf Club ~ North Right,White,4,4,3,5,3,estimated,,,145,2,54度,CHIP,Fairway,Rough,42,36,11,351845581
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ South Left+Chang Gung Golf Club ~ North Right,White,5,5,4,5,2,estimated,,HIT,384,1,一號木桿,TEE,TeeBox,Fairway,158,384,229,351845581
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ South Left+Chang Gung Golf Club ~ North Right,White,5,5,4,5,2,estimated,,HIT,384,2,鐵木桿,LAYUP,Fairway,Rough,124,229,106,351845581
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ South Left+Chang Gung Golf Club ~ North Right,White,5,5,4,5,2,estimated,,HIT,384,3,8鐵,APPROACH,Rough,Green,105,106,1,351845581
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ South Left+Chang Gung Golf Club ~ North Right,White,6,6,4,8,3,estimated,,RIGHT,326,1,一號木桿,TEE,TeeBox,Rough,173,326,162,351845581
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ South Left+Chang Gung Golf Club ~ North Right,White,6,6,4,8,3,estimated,,RIGHT,326,2,8鐵,LAYUP,Rough,Fairway,45,162,118,351845581
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ South Left+Chang Gung Golf Club ~ North Right,White,6,6,4,8,3,estimated,,RIGHT,326,3,鐵木桿,APPROACH,Fairway,Rough,74,118,45,351845581
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ South Left+Chang Gung Golf Club ~ North Right,White,6,6,4,8,3,estimated,,RIGHT,326,4,54度,CHIP,Rough,Rough,35,45,11,351845581
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ South Left+Chang Gung Golf Club ~ North Right,White,7,7,3,7,3,estimated,,,167,1,鐵木桿,APPROACH,TeeBox,Rough,119,167,76,351845581
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ South Left+Chang Gung Golf Club ~ North Right,White,7,7,3,7,3,estimated,,,167,2,A杆,APPROACH,Rough,Rough,108,76,32,351845581
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ South Left+Chang Gung Golf Club ~ North Right,White,7,7,3,7,3,estimated,,,167,3,54度,CHIP,Rough,Green,31,32,2,351845581
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ South Left+Chang Gung Golf Club ~ North Right,White,8,8,4,7,2,estimated,,LEFT,271,1,一號木桿,TEE,TeeBox,TeeBox,59,271,212,351845581
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ South Left+Chang Gung Golf Club ~ North Right,White,8,8,4,7,2,estimated,,LEFT,271,2,鐵木桿,UNKNOWN,TeeBox,Rough,30,212,183,351845581
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ South Left+Chang Gung Golf Club ~ North Right,White,8,8,4,7,2,estimated,,LEFT,271,3,鐵木桿,UNKNOWN,Rough,Rough,110,183,96,351845581
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ South Left+Chang Gung Golf Club ~ North Right,White,8,8,4,7,2,estimated,,LEFT,271,4,9鐵,APPROACH,Rough,Fairway,72,96,25,351845581
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ South Left+Chang Gung Golf Club ~ North Right,White,8,8,4,7,2,estimated,,LEFT,271,5,54度,UNKNOWN,Fairway,Green,25,25,0,351845581
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ South Left+Chang Gung Golf Club ~ North Right,White,9,9,4,7,3,estimated,,LEFT,406,1,一號木桿,TEE,TeeBox,Rough,119,406,287,351845581
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ South Left+Chang Gung Golf Club ~ North Right,White,9,9,4,7,3,estimated,,LEFT,406,2,鐵木桿,LAYUP,Rough,Fairway,91,287,209,351845581
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ South Left+Chang Gung Golf Club ~ North Right,White,9,9,4,7,3,estimated,,LEFT,406,3,鐵木桿,LAYUP,Fairway,Fairway,96,209,118,351845581
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ Center Left,White,10,1,4,5,2,estimated,,HIT,350,1,一號木桿,TEE,TeeBox,Fairway,168,350,184,351851650
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ Center Left,White,10,1,4,5,2,estimated,,HIT,350,2,鐵木桿,UNKNOWN,Fairway,Rough,139,184,54,351851650
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ Center Left,White,10,1,4,5,2,estimated,,HIT,350,3,54度,APPROACH,Rough,Green,54,54,0,351851650
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ Center Left,White,11,2,4,5,3,estimated,,RIGHT,285,1,一號木桿,TEE,TeeBox,Rough,152,285,133,351851650
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ Center Left,White,11,2,4,5,3,estimated,,RIGHT,285,2,鐵木桿,APPROACH,Rough,Fairway,121,133,14,351851650
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ Center Left,White,12,3,5,6,2,estimated,,HIT,430,1,一號木桿,TEE,TeeBox,Fairway,155,430,281,351851650
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ Center Left,White,12,3,5,6,2,estimated,,HIT,430,2,鐵木桿,LAYUP,Fairway,Fairway,122,281,159,351851650
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ Center Left,White,12,3,5,6,2,estimated,,HIT,430,3,鐵木桿,APPROACH,Fairway,Fairway,85,159,74,351851650
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ Center Left,White,12,3,5,6,2,estimated,,HIT,430,4,A杆,APPROACH,Fairway,Green,74,74,6,351851650
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ Center Left,White,13,4,3,5,3,estimated,,,134,1,鐵木桿,APPROACH,TeeBox,Green,134,134,6,351851650
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ Center Left,White,14,5,5,8,3,estimated,,HIT,503,1,一號木桿,TEE,TeeBox,Fairway,176,503,335,351851650
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ Center Left,White,14,5,5,8,3,estimated,,HIT,503,2,鐵木桿,LAYUP,Fairway,Fairway,78,335,258,351851650
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ Center Left,White,14,5,5,8,3,estimated,,HIT,503,3,6鐵,LAYUP,Fairway,Fairway,125,258,136,351851650
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ Center Left,White,14,5,5,8,3,estimated,,HIT,503,4,鐵木桿,APPROACH,Fairway,Fairway,104,136,32,351851650
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ Center Left,White,14,5,5,8,3,estimated,,HIT,503,5,54度,CHIP,Fairway,Rough,39,32,12,351851650
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ Center Left,White,15,6,4,8,3,estimated,,LEFT,387,1,一號木桿,TEE,TeeBox,Rough,138,387,250,351851650
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ Center Left,White,15,6,4,8,3,estimated,,LEFT,387,2,鐵木桿,LAYUP,Rough,Rough,119,250,132,351851650
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ Center Left,White,15,6,4,8,3,estimated,,LEFT,387,3,鐵木桿,APPROACH,Rough,Fairway,68,132,64,351851650
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ Center Left,White,15,6,4,8,3,estimated,,LEFT,387,4,A杆,APPROACH,Fairway,Fairway,48,64,18,351851650
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ Center Left,White,15,6,4,8,3,estimated,,LEFT,387,5,,UNKNOWN,Fairway,Green,18,18,0,351851650
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ Center Left,White,16,7,4,6,2,estimated,,RIGHT,315,1,一號木桿,TEE,TeeBox,Rough,176,315,148,351851650
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ Center Left,White,16,7,4,6,2,estimated,,RIGHT,315,2,7鐵,LAYUP,Rough,Fairway,10,148,137,351851650
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ Center Left,White,16,7,4,6,2,estimated,,RIGHT,315,3,鐵木桿,APPROACH,Fairway,Fairway,107,137,32,351851650
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ Center Left,White,16,7,4,6,2,estimated,,RIGHT,315,4,54度,CHIP,Fairway,Fairway,19,32,13,351851650
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ Center Left,White,17,8,3,5,3,estimated,,,138,1,鐵木桿,APPROACH,TeeBox,Rough,140,138,11,351851650
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ Center Left,White,18,9,4,5,3,estimated,,HIT,328,1,一號木桿,TEE,TeeBox,Fairway,163,328,175,351851650
+2026-03-06,長庚高爾夫球場,Chang Gung Golf Club ~ Center Left,White,18,9,4,5,3,estimated,,HIT,328,2,,UNKNOWN,Fairway,Rough,131,175,45,351851650
