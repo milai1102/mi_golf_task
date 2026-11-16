@@ -594,10 +594,12 @@ PLAN_START = "2026-11-16"          # 計劃定案的日期，這一天之後的�
 PLAN_GOAL = {"score": 95, "by": "2026 年底前", "next": "明年第一季 90"}
 PLAN_BLOW = 1                      # 每場爆桿幾洞以下（推桿的門檻用 TARGET_ROUND_PUTTS）
 PLAN_BAG = ["鐵木桿", "6鐵", "8鐵", "P杆"]
-PLAN_TRAIN = [["長推的距離感", "下場前在練習果嶺推 20 分鐘，只推 8 到 15 步。在家的 4 步照舊。"],
-              ["鐵木桿", "練習場模擬球洞的練法照舊，重心放在這一支。"]]
+PLAN_TRAIN = [["長推的距離感", "下場前在練習果嶺推 20 分鐘，只推 8 到 15 步。在家的 4 步照舊，每球換距離。"],
+              ["鐵木桿", "練習場模擬球洞的練法照舊，重心放在這一支。"],
+              ["80 碼內一次上果嶺", "每隔一天的切球練習照舊，多練 50 到 80 碼。"],
+              ["一號木 180 碼、少右曲", "先消滅 150 碼以下的開球，再把常態拉到 180。"]]
 PLAN_RULE = ["選桿用常態距離，不用最好的距離", "上場的揮桿幅度比練習場小，距離固定短 10 到 20 碼。打得好飛過頭的機率低，可以接受。"]
-PLAN_LATER = ["把 8 鐵、P 杆的距離練長", "一號木 180 碼在球道上", "三號木"]
+PLAN_LATER = ["把 8 鐵、P 杆的距離練長", "三號木"]
 
 def section_plan(con):
     rounds = con.execute("SELECT round_id, date, course_short, strokes FROM rounds WHERE category='full_18' ORDER BY date DESC").fetchall()
@@ -616,11 +618,22 @@ def section_plan(con):
     hy = [x[0] for x in con.execute(f"SELECT distance_yd FROM shots WHERE club='鐵木桿' AND distance_yd IS NOT NULL AND round_id IN ({q})", ids)]
     hmed = next(b["med"] for b in bag if b["club"] == "鐵木桿")
     facts = {"three": avg("three", base), "hy_n": round(len(hy) / max(1, len(ids)), 1), "hy_bad": round(100 * sum(x < MISHIT_RATIO * hmed for x in hy) / max(1, len(hy)))}
-    data = {"goal": PLAN_GOAL, "check": {"putts": TARGET_ROUND_PUTTS, "blow": PLAN_BLOW}, "start": PLAN_START, "base": {"n": len(base), "strokes": avg("strokes", base), "best": min(r["strokes"] for r in base), "putts": avg("putts", base), "blow": avg("blow", base)},
+    dr = con.execute(f"SELECT s.distance_yd, h.fairway FROM shots s JOIN holes h USING(round_id, seq) WHERE s.club='一號木桿' AND s.shot_no=1 AND s.distance_yd IS NOT NULL AND s.round_id IN ({q})", ids).fetchall()
+    dd = sorted(x[0] for x in dr); pct = lambda k, n: round(100 * k / max(1, n))
+    ch = con.execute(f"""SELECT s.to_pin_start_m*1.09361, s.end_lie, s.to_pin_end_m,
+        (SELECT COUNT(*) FROM shots t WHERE t.round_id=s.round_id AND t.seq=s.seq AND t.shot_type!='PUTT' AND t.shot_no>s.shot_no)
+        FROM shots s WHERE s.shot_type!='PUTT' AND s.to_pin_start_m>0 AND s.to_pin_start_m*1.09361<=80 AND s.round_id IN ({q})
+        AND NOT EXISTS(SELECT 1 FROM shots p WHERE p.round_id=s.round_id AND p.seq=s.seq AND p.shot_no<s.shot_no AND p.shot_type!='PUTT' AND p.to_pin_start_m>0 AND p.to_pin_start_m*1.09361<=80)""", ids).fetchall()
+    on = lambda rs: sum(1 for d, lie, end, later in rs if later == 0 and (lie == "Green" or end == 0)); far = [r for r in ch if r[0] > 50]
+    fl = [f"每場三推 {facts['three']} 洞", f"每場打 {facts['hy_n']} 次，{facts['hy_bad']}% 打壞",
+          f"每場 {round(len(ch) / max(1, len(ids)), 1)} 次，{pct(on(ch), len(ch))}% 一次上（50 到 80 碼 {pct(on(far), len(far))}%）",
+          f"常態 {dd[(len(dd) - 1) // 2] if dd else '—'} 碼，180 以上 {pct(sum(x >= 180 for x in dd), len(dd))}%，偏右 {pct(sum(f == 'RIGHT' for _, f in dr), len(dr))}%，150 以下 {pct(sum(x < 150 for x in dd), len(dd))}%"]
+    data = {"factlist": fl, "goal": PLAN_GOAL, "check": {"putts": TARGET_ROUND_PUTTS, "blow": PLAN_BLOW}, "start": PLAN_START, "base": {"n": len(base), "strokes": avg("strokes", base), "best": min(r["strokes"] for r in base), "putts": avg("putts", base), "blow": avg("blow", base)},
             "after": after, "recent": base[:5], "train": PLAN_TRAIN, "rule": PLAN_RULE, "later": PLAN_LATER, "bag": bag, "facts": facts, "total": len(rows)}
     note = (f"目標與計劃在 {PLAN_START} 定案，文字寫在 build_report.py 的 PLAN_* 常數。現況是定案前最近 {len(base)} 場完整 18 洞的平均。"
             f"爆桿＝超出標準桿 3 桿以上的洞。常態距離是該桿全部場次的中位數、打得好是第 75 百分位（不含每洞最後一筆被設成旗桿的擊球）。"
-            f"鐵木桿打壞＝距離低於中位數的 {int(MISHIT_RATIO * 100)}%。")
+            f"鐵木桿打壞＝距離低於中位數的 {int(MISHIT_RATIO * 100)}%。"
+            f"80 碼內一次上果嶺＝每洞第一次在 80 碼內的擊球，之後沒有再記錄到其他擊球、而且落點在果嶺（手錶漏記第二次切球時會偏高）。一號木只算每洞第一桿，偏右是 Garmin 的開球判定。")
     return {"id": "plan", "title": "訓練計劃", "note": note, "kind": "plan", "data": data, "table": {"head": [], "rows": []}}
 
 def section_roundlist(con):
@@ -1312,8 +1325,7 @@ DRAW.plan = (sec, host) => {
   rows.forEach(r => { const tr = h("tr", "", tb); h("td", "", tr, r.date.slice(2).replaceAll("-", "/")); h("td", "", tr, r.short);
     mk(h("td", "", tr), r.strokes, r.strokes <= d.goal.score); mk(h("td", "", tr), r.putts, r.putts <= d.check.putts); mk(h("td", "", tr), r.blow, r.blow <= d.check.blow); });
   h("div", "cap", box, d.after.length ? "計劃開始後的 " + d.after.length + " 場，綠色是達標" : "計劃開始前最近 " + rows.length + " 場，綠色是達標。下一場起列在這裡");
-  h("h3", "", box, "只練兩件事");
-  const facts = ["每場三推 " + d.facts.three + " 洞", "每場打 " + d.facts.hy_n + " 次，" + d.facts.hy_bad + "% 打壞"];
+  h("h3", "", box, "練習項目（依重要性排序）"); const facts = d.factlist;
   d.train.forEach(([t, body], i) => { const c = h("div", "pcard", box); h("b", "num", c, String(i + 1)); const w = h("div", "", c); h("div", "t", w, t); h("div", "f", w, facts[i]); h("div", "b", w, body); });
   h("h3", "", box, "上場只守一條");
   const c = h("div", "pcard rule", box), w = h("div", "", c); h("div", "t", w, d.rule[0]); h("div", "b", w, d.rule[1]);
