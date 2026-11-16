@@ -798,7 +798,7 @@ nav{margin:10px 0 0}nav a{font-size:12px;padding:3px 10px}
 .cplays{width:100%;margin-top:6px;font-size:12px;color:#c3c2b7}.cplays td{padding:3px 4px;text-align:center;border-bottom:1px solid #2c2c2a;white-space:nowrap}.cplays td.bad{color:#f06a6a;font-weight:600}.cplays td.good{color:#2fbf4f;font-weight:600}
 .sub.holes .fchip{min-width:34px;padding:2px 6px}
 .cmap{height:360px;border-radius:12px;margin:4px 0 12px;overflow:hidden;background:var(--page);z-index:0}
-.leaflet-tooltip.ctip{background:rgba(17,17,16,.9);color:#f0efec;border:0;border-radius:6px;padding:2px 7px;font-size:12px;font-weight:600;box-shadow:none;white-space:nowrap}.leaflet-tooltip.ctip:before{display:none}.cmap .leaflet-interactive{cursor:pointer}
+.leaflet-tooltip.ctip{background:rgba(17,17,16,.9);color:#f0efec;border:0;border-radius:6px;padding:2px 7px;font-size:12px;font-weight:600;box-shadow:none;white-space:nowrap}.leaflet-tooltip.ctip:before{display:none}.cmap .leaflet-interactive{cursor:pointer}.cmap .tdark{filter:invert(1) hue-rotate(180deg) brightness(.9) contrast(.9)}
 .hint{display:none;font-size:12px;color:var(--muted);margin:0 0 4px}
 .chart.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}.chart.scroll svg{width:var(--w);max-width:none}
 details{overflow-x:auto}
@@ -1097,7 +1097,7 @@ DRAW.courses = (sec, host) => {
   const fit = () => { if (!map) return; const pts = sec.data.filter(c => c.region === region && c.ll).map(c => c.ll); if (pts.length) map.fitBounds(pts, { padding: [48, 48], maxZoom: 11 }); };
   const paint = () => marks.forEach(([i, m]) => { const on = i === ci; m.setStyle({ radius: on ? 11 : 8, fillColor: on ? "#ff5a5a" : "#3987e5", weight: on ? 3 : 2 }); if (on) m.bringToFront(); });
   const initMap = () => { mapEl.style.display = ""; map = L.map(mapEl, { zoomControl: true, attributionControl: true, scrollWheelZoom: false, preferCanvas: true, zoomSnap: 0.25 }); map.attributionControl.setPrefix(false);
-    L.tileLayer(`https://{s}.basemaps.cartocdn.com/${DARK ? "dark_all" : "light_all"}/{z}/{x}/{y}{r}.png`, { subdomains: "abcd", maxZoom: 18, attribution: "© OpenStreetMap contributors © CARTO" }).addTo(map);
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18, className: DARK ? "tdark" : "", attribution: "© OpenStreetMap contributors" }).addTo(map);
     sec.data.forEach((c, i) => { if (!c.ll) return; const m = L.circleMarker(c.ll, { color: "#fff", fillOpacity: 1 }).addTo(map);
       m.bindTooltip(`${c.short} ${c.n}`, { permanent: true, direction: "top", offset: [0, -8], className: "ctip", interactive: true }); m.on("click", () => { ci = i; li = 0; region = c.region; draw(); host.querySelector(".sub.holes").scrollIntoView({ behavior: "smooth", block: "start" }); }); marks.push([i, m]); });
     fit(); paint(); };
