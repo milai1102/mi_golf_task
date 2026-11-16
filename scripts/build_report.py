@@ -533,7 +533,13 @@ def round_gps(fname):
                 n = int(c[0][1:]); seq = seq_of.get((sid, n)); pin = c[2].split(",")
                 cur = None
                 if seq is None: continue
-                cur = {"n": seq, "h": n, "cid": cid, "par": int(c[1]) if c[1] else None, "pin": [int(pin[2]), int(pin[3])] if len(pin) > 3 and pin[2] else None, "shots": []}; holes.append(cur)
+                hc, hn = cid, n                                                  # 一張 18 洞的卡可能是兩區組合：後九其實是另一個球場代碼的第 1 到 9 洞，以地圖路徑為準
+                mp = c[3].split("/") if len(c) > 3 and c[3] else []
+                if len(mp) >= 2 and mp[0].startswith("gid") and mp[1].startswith("hole"): hc, hn = mp[0][3:], int(mp[1][4:])
+                if hc not in GEO:
+                    gp = os.path.join(ROOT, "data/course_geo", f"{hc}.json")
+                    GEO[hc] = json.load(open(gp))["holes"] if os.path.exists(gp) else {}
+                cur = {"n": seq, "h": hn, "cid": hc, "par": int(c[1]) if c[1] else None, "pin": [int(pin[2]), int(pin[3])] if len(pin) > 3 and pin[2] else None, "shots": []}; holes.append(cur)
             elif c[0] and cur is not None:
                 s, e = c[4].split(","), c[5].split(",")
                 if not s[2] or not e[2]: continue
@@ -541,7 +547,7 @@ def round_gps(fname):
                 sp, ep = (int(s[2]), int(s[3])), (int(e[2]), int(e[3])); yd = round(int(c[3]) * 1.09361)
                 cur["shots"].append([club, cat, sp[0], sp[1], ep[0], ep[1], yd, e[4]])
                 if cat == "d" and int(c[0]) == 1:                                   # 只算開球那一桿
-                    fo = fairway_offset(sp, ep, int(c[3]), GEO.get(cid, {}).get(str(n), {}).get("fairway", []))
+                    fo = fairway_offset(sp, ep, int(c[3]), GEO.get(cur["cid"], {}).get(str(cur["h"]), {}).get("fairway", []))
                     drive.append({"hole": seq, "yd": yd, "width": fo[0] if fo else None, "off": fo[1] if fo else None, "fw": e[4] == "Fairway"})
     holes.sort(key=lambda h: h["n"]); drive.sort(key=lambda d: d["hole"])
     return {"holes": holes, "drive": drive} if holes else None
@@ -558,11 +564,12 @@ def section_courses(con):
         for sid, lay in layout.items():
             p = os.path.join(ROOT, "data/raw/gps", f"{sid}.txt")
             if os.path.exists(p): cid_layout[open(p, encoding="utf-8").readline().split("|")[1]] = "／".join(layout_labels(lay))
+        per = round_parts(fname)[0]
         c = courses.setdefault(short, {"name": course, "short": short, "layouts": {}, "last": date, "rounds": set()})
         c["last"] = date; c["rounds"].add(rid)
         for H in g["holes"]:
             par, st, putts = hrow.get(H["n"], (H["par"], None, None))
-            L = c["layouts"].setdefault(H["cid"], {"cid": H["cid"], "label": cid_layout.get(H["cid"], ""), "holes": {}})
+            L = c["layouts"].setdefault(H["cid"], {"cid": H["cid"], "label": (per[H["n"] - 1] if per and H["n"] <= len(per) else "") or cid_layout.get(H["cid"], ""), "holes": {}})
             hh = L["holes"].setdefault(H["h"], {"h": H["h"], "par": par, "plays": []})
             hh["plays"].append({"date": date, "st": st, "putts": putts, "pin": H["pin"], "shots": H["shots"]})
     out = []
