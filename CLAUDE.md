@@ -287,3 +287,4 @@ python3 scripts/build_report.py      # golf.db → reports/index.html（整頁�
 - 地圖用 Leaflet 1.9.4（unpkg）＋ CARTO 的 OpenStreetMap 底圖（深色／淺色跟著系統），不需要金鑰。**這是整個網站唯一載入外部資源的地方**；載入失敗時地圖區塊不顯示，標籤照常可用。Leaflet 的 CSS 比頁面的 CSS 晚載入，覆寫樣式要用 `.leaflet-tooltip.ctip` 這種較高的優先度；頁面的 `.chart svg{width:100%}` 會弄壞 Leaflet 的 SVG，所以用 `preferCanvas` 並關掉 attribution 的前綴圖示。
 - 雲端的測試環境連不到底圖，截圖裡地圖是灰底；底圖實際的樣子要請使用者在自己的瀏覽器確認。
 - 區域名稱照使用者的說法：**北台灣、中台灣、南台灣、越南**（其他國家才用「國外」）。使用者口頭只說了「北台灣、中台灣、越南」，但南部有 8 個球場，所以保留南台灣。
+- 越南的三個球場都在河內一帶，區域名稱用使用者指定的「**越南河內**」；之後若打越南其他城市的球場才會出現「越南」。
