@@ -514,6 +514,32 @@ def round_gps(fname):
     holes.sort(key=lambda h: h["n"]); drive.sort(key=lambda d: d["hole"])
     return {"holes": holes, "drive": drive} if holes else None
 
+def section_courses(con):
+    """球場紀錄：每個球場、每一洞把歷次打過的路線疊在一起，下場前或打完檢討用。"""
+    courses = {}      # 簡稱 → {name, layouts: {cid: {label, holes: {洞號: {par, plays: [...]}}}}}
+    for rid, date, course, short, fname in con.execute("SELECT round_id, date, course, course_short, file FROM rounds ORDER BY date"):
+        g = round_gps(fname)
+        if not g: continue
+        hrow = {seq: (par, st, putts) for seq, par, st, putts in con.execute("SELECT seq, par, strokes, putts FROM holes WHERE round_id=?", (rid,))}
+        layout = {r["garmin_scorecard_id"]: r["layout"] for r in csv.DictReader(open(os.path.join(ROOT, "data/rounds", fname), encoding="utf-8-sig"))}
+        cid_layout = {}
+        for sid, lay in layout.items():
+            p = os.path.join(ROOT, "data/raw/gps", f"{sid}.txt")
+            if os.path.exists(p): cid_layout[open(p, encoding="utf-8").readline().split("|")[1]] = lay.split("~")[1].strip() if "~" in lay else ""
+        c = courses.setdefault(short, {"name": course, "short": short, "layouts": {}, "last": date, "rounds": set()})
+        c["last"] = date; c["rounds"].add(rid)
+        for H in g["holes"]:
+            par, st, putts = hrow.get(H["n"], (H["par"], None, None))
+            L = c["layouts"].setdefault(H["cid"], {"cid": H["cid"], "label": cid_layout.get(H["cid"], ""), "holes": {}})
+            hh = L["holes"].setdefault(H["h"], {"h": H["h"], "par": par, "plays": []})
+            hh["plays"].append({"date": date, "st": st, "putts": putts, "pin": H["pin"], "shots": H["shots"]})
+    out = []
+    for c in sorted(courses.values(), key=lambda c: c["last"], reverse=True):
+        lays = [{"cid": L["cid"], "label": L["label"], "holes": [L["holes"][k] for k in sorted(L["holes"])]} for L in c["layouts"].values()]
+        out.append({"short": c["short"], "name": c["name"], "n": len(c["rounds"]), "last": c["last"], "layouts": lays})
+    note = "每一洞把歷次的擊球路線疊在同一張圖上，最近一次最清楚，越早的越淡。紅＝一號木、橘＝鐵木桿、藍＝鐵桿、細白線＝切球桿。球場輪廓是依 Garmin 地圖重新描的示意圖。"
+    return {"id": "courses", "title": "球場紀錄", "note": note, "kind": "courses", "data": out, "table": {"head": [], "rows": []}}
+
 def section_roundlist(con):
     tags = {"short_course": "短球場", "partial": "未打完", "nine": "9 洞"}; out = []
     for rid, date, course, cat, n, strokes, over, diff, short, fname in con.execute("SELECT round_id, date, course, category, holes_played, strokes, over_par, differential, course_short, file FROM rounds ORDER BY date DESC"):
@@ -715,6 +741,11 @@ th{color:var(--ink2);font-weight:500}
 .tabs{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px}.chart .legend svg,.chart .sclg svg{display:inline-block;width:auto;height:auto;flex:none}.panel .legend{margin-top:10px}.panel{padding:6px 0 4px}
 .maps{display:grid;gap:10px;margin-top:8px}.maps figure{margin:0;background:#111110;border-radius:10px;padding:6px 4px 4px;min-width:0}.maps figcaption{font-size:12px;color:#c3c2b7;text-align:center;padding-bottom:2px;white-space:nowrap}
 .maps svg{display:block;width:100%}.maps.strip{width:calc(100vw - 46px);display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;gap:8px;padding-bottom:6px}.maps.strip figure{flex:0 0 calc((100% - (var(--per) - 1) * 8px) / var(--per));scroll-snap-align:start}.sub{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:12px;color:var(--ink2);margin-top:6px}.sub .fchip{font-size:12px;padding:2px 10px}
+.toplinks{display:flex;gap:8px;margin:10px 0 0}.toplinks a{font-size:14px;font-weight:600;color:var(--surface);background:var(--ink);text-decoration:none;border-radius:999px;padding:5px 16px}
+.maps.strip.big{width:auto}.maps.strip.big figure{padding:10px 8px 8px}.maps.strip.big figcaption{font-size:15px;font-weight:600;color:#f0efec}
+.cstat{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 14px;font-size:12px;color:#c3c2b7;padding:2px 0 6px}.cstat b{color:#f0efec;font-weight:600}
+.cplays{width:100%;margin-top:6px;font-size:12px;color:#c3c2b7}.cplays td{padding:3px 4px;text-align:center;border-bottom:1px solid #2c2c2a;white-space:nowrap}.cplays td.bad{color:#f06a6a;font-weight:600}.cplays td.good{color:#2fbf4f;font-weight:600}
+.sub.holes .fchip{min-width:34px;padding:2px 6px}
 .hint{display:none;font-size:12px;color:var(--muted);margin:0 0 4px}
 .chart.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}.chart.scroll svg{width:var(--w);max-width:none}
 details{overflow-x:auto}
@@ -728,7 +759,7 @@ section{padding:14px 12px 12px;margin-top:14px;border-radius:10px}section h2{fon
 .legend{gap:6px 14px}th,td{padding:4px 8px}
 }
 </style></head><body><div class="wrap">
-<header><h1 id="h1"></h1><p id="meta"></p></header><nav id="nav"></nav><main id="main"></main><p class="morelink"><a id="link"></a></p></div>
+<header><h1 id="h1"></h1><p id="meta"></p><p class="toplinks" id="top"></p></header><nav id="nav"></nav><main id="main"></main><p class="morelink"><a id="link"></a></p></div>
 <script>
 const REPORT = __DATA__;
 const NS = "http://www.w3.org/2000/svg";
@@ -996,6 +1027,38 @@ DRAW.putts = (sec, host) => {
 };
 
 // 場次總表：一列一場，可篩選類別，點一下展開該場 18 洞明細
+// 球場紀錄：選球場 → 一洞一張大圖，左右滑動；每一洞疊上歷次的路線
+DRAW.courses = (sec, host) => {
+  const MAPC = { outline: "#2f5d2a", tree: "#1c3a1e", fairway: "#58963f", water: "#3c6edc", sand: "#e1cdaa", green: "#8ccd6e" }, SHOTC = { d: "#ff5a5a", w: "#ffa51f", i: "#5aa9ff", c: "#ffffff" };
+  let ci = 0, li = 0; const s1 = h("div", "filters", host), s2 = h("div", "sub", host), s3 = h("div", "sub holes", host), strip = h("div", "maps strip big", host), lg = h("div", "legend", host);
+  lg.innerHTML = [["d", "一號木"], ["w", "鐵木桿"], ["i", "鐵桿"]].map(([c, t]) => `<span><svg width="20" height="14"><line x1="1" y1="7" x2="13" y2="7" stroke="${SHOTC[c]}" stroke-width="2.4"/><circle cx="15" cy="7" r="3.6" fill="${SHOTC[c]}"/></svg>${t}</span>`).join("") +
+    `<span><svg width="20" height="14"><line x1="1" y1="7" x2="19" y2="7" stroke="var(--ink2)" stroke-width="1.2"/></svg>切球桿</span><span>越淡＝越早的場次</span>`;
+  const fig = (L, H) => { const f = document.createElement("figure"), geo = (REPORT.geo[L.cid] || {})[H.h] || {}, P = H.plays, sts = P.map(p => p.st).filter(v => v != null);
+    const dr = P.map(p => p.shots[0]).filter(s => s && s[1] === "d"), fw = dr.filter(s => s[7] === "Fairway").length;
+    h("figcaption", "", f, `第 ${H.h} 洞　Par ${H.par}`);
+    const st = h("div", "cstat", f); st.innerHTML = `<span>打過 <b>${P.length}</b> 次</span>` + (sts.length ? `<span>平均 <b>${(sts.reduce((a, b) => a + b, 0) / sts.length).toFixed(1)}</b> 桿</span><span>最好 <b>${Math.min(...sts)}</b></span>` : "") + (dr.length ? `<span>一號木上球道 <b>${fw}/${dr.length}</b></span>` : "");
+    const pts = []; (geo.outline || []).forEach(p => pts.push(...p)); P.forEach(p => { p.shots.forEach(s => pts.push([s[2], s[3]], [s[4], s[5]])); if (p.pin) pts.push(p.pin); }); const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+    if (pts.length) { const pad = geo.outline ? 10 : 40, x0 = Math.min(...xs) - pad, y0 = Math.min(...ys) - pad, w = Math.max(...xs) - x0 + pad, hh = Math.max(...ys) - y0 + pad, k = Math.max(w, hh) / 330;
+      const svg = el("svg", { viewBox: `${x0} ${y0} ${w} ${hh}`, style: `height:${NARROW() ? 470 : 520}px`, preserveAspectRatio: "xMidYMid meet" }, f);
+      ["outline", "tree", "fairway", "water", "sand", "green"].forEach(key => (geo[key] || []).forEach(p => el("polygon", { points: p.map(q => q.join(",")).join(" "), fill: MAPC[key] }, svg)));
+      P.forEach((p, i) => { const op = P.length === 1 ? 1 : 0.3 + 0.7 * i / (P.length - 1);      // 越新的越清楚
+        p.shots.forEach(s => { const c = SHOTC[s[1]], thin = s[1] === "c";
+          el("line", { x1: s[2], y1: s[3], x2: s[4], y2: s[5], stroke: c, "stroke-width": (thin ? 1.1 : 2.2) * k, "stroke-opacity": (thin ? 0.6 : 1) * op, "stroke-linecap": "round" }, svg);
+          if (!thin) el("circle", { cx: s[4], cy: s[5], r: 3.8 * k, fill: c, "fill-opacity": op, stroke: "#111", "stroke-width": 0.8 * k, "stroke-opacity": op }, svg).appendChild(el("title", {}, null, `${p.date}　${s[0]} ${s[6]} 碼`)); }); });
+      const pin = (P[P.length - 1] || {}).pin; if (pin) { const [px, py] = pin; el("line", { x1: px, y1: py, x2: px, y2: py - 16 * k, stroke: "#fff", "stroke-width": 1.5 * k }, svg); el("polygon", { points: `${px},${py - 16 * k} ${px + 9 * k},${py - 12.5 * k} ${px},${py - 9 * k}`, fill: "#ff3b3b" }, svg); } }
+    const tb = h("table", "cplays", f); P.slice().reverse().forEach(p => { const tr = h("tr", "", tb), d0 = p.shots[0], dv = p.st == null ? null : p.st - H.par;
+      h("td", "", tr, p.date.slice(2).replace(/-/g, "/")); h("td", dv == null ? "" : dv >= 3 ? "bad" : dv <= 0 ? "good" : "", tr, p.st == null ? "" : p.st + " 桿"); h("td", p.putts >= 3 ? "bad" : "", tr, p.putts == null ? "" : p.putts + " 推");
+      h("td", "", tr, d0 ? `${d0[0].replace("桿", "").replace("杆", "")} ${d0[6]} 碼` : ""); h("td", d0 && d0[7] === "Fairway" ? "good" : "", tr, d0 ? ({ Fairway: "球道", Rough: "長草", Bunker: "沙坑", Green: "果嶺", Waste: "荒地" }[d0[7]] || "") : ""); });
+    return f; };
+  const draw = () => { s1.replaceChildren(); s2.replaceChildren(); s3.replaceChildren(); strip.replaceChildren(); const C = sec.data[ci], L = C.layouts[li] || C.layouts[0];
+    sec.data.forEach((c, i) => { const b = h("button", "fchip" + (i === ci ? " on" : ""), s1, `${c.short} ${c.n}`); b.addEventListener("click", () => { ci = i; li = 0; draw(); }); });
+    if (C.layouts.length > 1) C.layouts.forEach((l, i) => { const b = h("button", "fchip" + (i === li ? " on" : ""), s2, l.label || `區 ${i + 1}`); b.addEventListener("click", () => { li = i; draw(); }); });
+    strip.style.setProperty("--per", NARROW() ? 1 : Math.min(3, L.holes.length));
+    L.holes.forEach((H, i) => { const f = fig(L, H); strip.appendChild(f); const b = h("button", "fchip", s3, H.h); b.addEventListener("click", () => strip.scrollTo({ left: f.offsetLeft - strip.offsetLeft, behavior: "smooth" })); });
+    strip.scrollLeft = 0; };
+  draw();
+};
+
 DRAW.roundlist = (sec, host) => {
   const SHOW = 10, cats = [["full", "完整 18 洞", true], ["partial", "未打完", false], ["short", "短球場", false]];
   const on = Object.fromEntries(cats.map(c => [c[0], c[2]])); let all = false;
@@ -1117,10 +1180,12 @@ DRAW.roundlist = (sec, host) => {
 
 document.getElementById("meta").textContent = REPORT.meta;
 document.getElementById("h1").textContent = REPORT.title; document.title = REPORT.title;
+(REPORT.top || []).forEach(([href, label]) => { const a = h("a", "", document.getElementById("top"), label); a.href = href; });
 { const a = document.getElementById("link"); a.textContent = REPORT.link[1]; a.href = REPORT.link[0]; }
 const main = document.getElementById("main"), nav = document.getElementById("nav");
 function render() {
   main.replaceChildren(); nav.replaceChildren();
+  nav.style.display = REPORT.sections.length > 1 ? "" : "none";
   for (const sec of REPORT.sections) {
     const a = h("a", "", nav, sec.title); a.href = "#" + sec.id;
     const s = h("section", "", main); s.id = sec.id;
@@ -1147,11 +1212,13 @@ def main():
     shots = con.execute("SELECT COUNT(*) FROM shots").fetchone()[0]
     meta = f"{n} 場（{first} 至 {last}）・{shots} 桿擊球紀錄・產生時間 {datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))):%Y-%m-%d %H:%M}"
     pages = [("index.html", "MI 高爾夫數據", MAIN, ["more.html", "更多分析（其餘 %d 張圖）→" % len(MORE)]),
-             ("more.html", "MI 高爾夫數據：更多分析", MORE, ["index.html", "← 回主頁"])]
+             ("more.html", "MI 高爾夫數據：更多分析", MORE, ["index.html", "← 回主頁"]),
+             ("courses.html", "MI 高爾夫數據：球場紀錄", [section_courses], ["index.html", "← 回主頁"])]
+    top = {"index.html": [["courses.html", "球場紀錄"], ["more.html", "更多分析"]], "more.html": [["index.html", "主頁"], ["courses.html", "球場紀錄"]], "courses.html": [["index.html", "主頁"], ["more.html", "更多分析"]]}
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     for fname, title, sections, link in pages:
         secs = [f(con) for f in sections]
-        report = {"meta": meta, "title": title, "link": link, "success": SUCCESS, "sections": secs, "geo": GEO if any(x["kind"] == "roundlist" for x in secs) else {}}
+        report = {"meta": meta, "title": title, "link": link, "success": SUCCESS, "sections": secs, "top": top[fname], "geo": GEO if any(x["kind"] in ("roundlist", "courses") for x in secs) else {}}
         path = os.path.join(os.path.dirname(OUT), fname)
         open(path, "w", encoding="utf-8").write(PAGE.replace("__DATA__", json.dumps(report, ensure_ascii=False)))
         print("已產生", path, "|", len(sections), "個區塊")
