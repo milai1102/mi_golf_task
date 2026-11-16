@@ -1178,8 +1178,8 @@ DRAW.roundlist = (sec, host) => {
       if (!thin) { el("circle", { cx: s[4], cy: s[5], r: 4.2 * k, fill: c, stroke: "#111", "stroke-width": 1 * k }, svg).appendChild(el("title", {}, null, `${s[0]} ${s[6]} 碼`)); } });
     if (H.pin) { const [px, py] = H.pin; el("line", { x1: px, y1: py, x2: px, y2: py - 16 * k, stroke: "#fff", "stroke-width": 1.5 * k }, svg); el("polygon", { points: `${px},${py - 16 * k} ${px + 9 * k},${py - 12.5 * k} ${px},${py - 9 * k}`, fill: "#ff3b3b" }, svg); }
     return fig; };
-  const mapPanel = (r, host) => { const strip = NARROW(); let per = strip ? 2 : 4, start = 0;   // 手機：全部的洞排成一橫列，左右滑動
-    const HS = r.gps.holes, sizes = strip ? [1, 2, 3] : [2, 4, 6, 9, 18].filter(n => n < HS.length || n === 18 && HS.length >= 18 || n === 4);
+  const mapPanel = (r, host) => { const strip = NARROW(); let per = strip ? 2 : 3, start = 0;   // 手機：全部的洞排成一橫列，左右滑動
+    const HS = r.gps.holes, sizes = strip ? [1, 2, 3] : [2, 3];
     const s1 = h("div", "sub", host), s2 = h("div", "sub", host), grid = h("div", "maps", host), lg = h("div", "legend", host);
     lg.innerHTML = [["d", "一號木"], ["w", "鐵木桿"], ["i", "鐵桿"]].map(([c, t]) => `<span><svg width="20" height="14"><line x1="1" y1="7" x2="13" y2="7" stroke="${SHOTC[c]}" stroke-width="2.4"/><circle cx="15" cy="7" r="3.6" fill="${SHOTC[c]}"/></svg>${t}</span>`).join("") +
       `<span><svg width="20" height="14"><line x1="1" y1="7" x2="19" y2="7" stroke="var(--ink2)" stroke-width="1.2"/></svg>切球桿</span>`;
@@ -1188,9 +1188,9 @@ DRAW.roundlist = (sec, host) => {
       if (strip) { h("span", "", s2, "↔ 左右滑動看下一洞"); grid.className = "maps strip"; grid.style.setProperty("--per", per);
         const hpx = per === 1 ? 500 : per === 2 ? 400 : 300; HS.forEach(H => grid.appendChild(holeMap(r, H, hpx, per === 3))); grid.scrollLeft = 0; return; }
       if (per < HS.length) for (let i = 0; i < HS.length; i += per) { const b = h("button", "fchip" + (i === start ? " on" : ""), s2, `${HS[i].n}–${HS[Math.min(i + per, HS.length) - 1].n}`); b.addEventListener("click", () => { start = i; draw(); }); }
-      const show = HS.slice(start, start + per), cols = NARROW() ? Math.min(2, show.length) : per <= 6 ? Math.min(per, show.length) : 9;
-      grid.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`; const hpx = NARROW() ? 250 : per <= 4 ? 460 : per <= 6 ? 340 : 230;
-      show.forEach(H => grid.appendChild(holeMap(r, H, hpx, !NARROW() && per > 4))); };
+      const show = HS.slice(start, start + per), cols = per;
+      grid.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`; const hpx = per === 2 ? 560 : 500;
+      show.forEach(H => grid.appendChild(holeMap(r, H, hpx, false))); };
     draw(); };
   // 點開一場：計分卡在上，下面一排按鈕選要看的細節
   const detail = r => { const box = document.createElement("div"); h("div", "scname", box, r.course); box.appendChild(card(r));
