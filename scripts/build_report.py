@@ -589,6 +589,40 @@ def section_courses(con):
     note = "每一洞把歷次的擊球路線疊在同一張圖上，最近一次最清楚，越早的越淡。紅＝一號木、橘＝鐵木桿、藍＝鐵桿、細白線＝切球桿。球場輪廓是依 Garmin 地圖重新描的示意圖。"
     return {"id": "courses", "title": "打過的球場", "note": note, "kind": "courses", "data": out, "table": {"head": [], "rows": []}}
 
+# ---- 訓練計劃（第四個頁籤）：目標與計劃的文字在這裡改，數字由資料算出 ----
+PLAN_START = "2026-11-16"          # 計劃定案的日期，這一天之後的場次才算「計劃開始後」
+PLAN_GOAL = {"score": 95, "by": "2026 年底前", "next": "明年第一季 90"}
+PLAN_BLOW = 1                      # 每場爆桿幾洞以下（推桿的門檻用 TARGET_ROUND_PUTTS）
+PLAN_BAG = ["鐵木桿", "6鐵", "8鐵", "P杆"]
+PLAN_TRAIN = [["長推的距離感", "下場前在練習果嶺推 20 分鐘，只推 8 到 15 步。在家的 4 步照舊。"],
+              ["鐵木桿", "練習場模擬球洞的練法照舊，重心放在這一支。"]]
+PLAN_RULE = ["選桿用常態距離，不用最好的距離", "上場的揮桿幅度比練習場小，距離固定短 10 到 20 碼。打得好飛過頭的機率低，可以接受。"]
+PLAN_LATER = ["把 8 鐵、P 杆的距離練長", "一號木 180 碼在球道上", "三號木"]
+
+def section_plan(con):
+    rounds = con.execute("SELECT round_id, date, course_short, strokes FROM rounds WHERE category='full_18' ORDER BY date DESC").fetchall()
+    def stat(rid):
+        putts, three, blow = con.execute("SELECT SUM(putts), SUM(putts>=3), SUM(over_par>=3) FROM holes WHERE round_id=?", (rid,)).fetchone()
+        return putts, three or 0, blow or 0
+    rows = [{"date": d, "short": sh, "strokes": st, "putts": stat(rid)[0], "three": stat(rid)[1], "blow": stat(rid)[2], "after": d > PLAN_START} for rid, d, sh, st in rounds]
+    base = [r for r in rows if not r["after"]][:RECENT_N]; after = [r for r in rows if r["after"]]
+    avg = lambda k, rs: round(sum(r[k] for r in rs if r[k] is not None) / max(1, sum(r[k] is not None for r in rs)), 1)
+    ids = [rid for rid, d, sh, st in rounds if d <= PLAN_START][:RECENT_N]; q = ",".join("?" * len(ids))
+    med_all = lambda club: sorted(x[0] for x in con.execute("SELECT distance_yd FROM shots WHERE club=? AND to_pin_end_m>0 AND distance_yd IS NOT NULL", (club,)))
+    bag = []
+    for club in PLAN_BAG:
+        d = med_all(club)
+        bag.append({"club": club, "n": len(d), "med": d[(len(d) - 1) // 2] if d else None, "good": d[int((len(d) - 1) * .75)] if d else None})
+    hy = [x[0] for x in con.execute(f"SELECT distance_yd FROM shots WHERE club='鐵木桿' AND distance_yd IS NOT NULL AND round_id IN ({q})", ids)]
+    hmed = next(b["med"] for b in bag if b["club"] == "鐵木桿")
+    facts = {"three": avg("three", base), "hy_n": round(len(hy) / max(1, len(ids)), 1), "hy_bad": round(100 * sum(x < MISHIT_RATIO * hmed for x in hy) / max(1, len(hy)))}
+    data = {"goal": PLAN_GOAL, "check": {"putts": TARGET_ROUND_PUTTS, "blow": PLAN_BLOW}, "start": PLAN_START, "base": {"n": len(base), "strokes": avg("strokes", base), "best": min(r["strokes"] for r in base), "putts": avg("putts", base), "blow": avg("blow", base)},
+            "after": after, "recent": base[:5], "train": PLAN_TRAIN, "rule": PLAN_RULE, "later": PLAN_LATER, "bag": bag, "facts": facts, "total": len(rows)}
+    note = (f"目標與計劃在 {PLAN_START} 定案，文字寫在 build_report.py 的 PLAN_* 常數。現況是定案前最近 {len(base)} 場完整 18 洞的平均。"
+            f"爆桿＝超出標準桿 3 桿以上的洞。常態距離是該桿全部場次的中位數、打得好是第 75 百分位（不含每洞最後一筆被設成旗桿的擊球）。"
+            f"鐵木桿打壞＝距離低於中位數的 {int(MISHIT_RATIO * 100)}%。")
+    return {"id": "plan", "title": "訓練計劃", "note": note, "kind": "plan", "data": data, "table": {"head": [], "rows": []}}
+
 def section_roundlist(con):
     tags = {"short_course": "短球場", "partial": "未打完", "nine": "9 洞"}; out = []
     for rid, date, course, cat, n, strokes, over, diff, short, fname in con.execute("SELECT round_id, date, course, category, holes_played, strokes, over_par, differential, course_short, file FROM rounds ORDER BY date DESC"):
@@ -797,6 +831,15 @@ nav{margin:10px 0 0}nav a{font-size:12px;padding:3px 10px}
 .cstat{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 14px;font-size:12px;color:#c3c2b7;padding:2px 0 6px}.cstat b{color:#f0efec;font-weight:600}
 .cplays{width:100%;margin-top:6px;font-size:12px;color:#c3c2b7}.cplays td{padding:3px 4px;text-align:center;border-bottom:1px solid #2c2c2a;white-space:nowrap}.cplays td.bad{color:#f06a6a;font-weight:600}.cplays td.good{color:#2fbf4f;font-weight:600}
 .sub.holes .fchip{min-width:34px;padding:2px 6px}
+.plan{max-width:560px;margin:0 auto}.plan .lead{color:var(--ink2);font-size:14px;margin:2px 0 14px}.plan h3{font-size:15px;margin:26px 0 10px;color:var(--ink)}
+.pgoal{border:1px solid var(--border);border-radius:14px;padding:18px 14px;text-align:center;background:var(--page)}.pgoal .big{font-size:44px;font-weight:700;line-height:1.15;margin:4px 0 6px}.plan .k{font-size:13px;color:var(--ink2)}
+.ptiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}.ptile{border:1px solid var(--border);border-radius:12px;padding:12px 10px;text-align:center;background:var(--page)}.ptile .v{font-size:24px;font-weight:700;margin:2px 0}
+.ptab{width:100%;margin-top:12px;font-size:14px;font-variant-numeric:tabular-nums}.ptab th{font-size:12px;color:var(--muted);font-weight:500}.ptab th,.ptab td{text-align:center;padding:7px 4px;border-bottom:1px solid var(--grid)}.ptab td.ok{color:var(--up);font-weight:700}.ptab td.no{color:var(--ink2)}.ptab td.strong{font-weight:700;font-size:16px}
+.plan .cap{font-size:12px;color:var(--muted);margin-top:6px;text-align:center}
+.pcard{display:flex;gap:12px;border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:10px;background:var(--page)}.pcard .num{flex:none;width:28px;height:28px;border-radius:50%;background:var(--ink);color:var(--surface);display:flex;align-items:center;justify-content:center;font-size:15px}
+.pcard .t{font-size:17px;font-weight:700}.pcard .f{font-size:13px;color:var(--trend);margin:2px 0 4px}.pcard .b{font-size:14px;color:var(--ink2);line-height:1.6}.pcard.rule{border-color:var(--series)}
+.plater{font-size:14px;color:var(--muted);line-height:1.8}
+@media (max-width:640px){.ptabs a{font-size:13px;padding:9px 2px}}
 .cmap{height:360px;border-radius:12px;margin:4px 0 12px;overflow:hidden;background:var(--page);z-index:0}
 .leaflet-tooltip.ctip{background:rgba(17,17,16,.9);color:#f0efec;border:0;border-radius:6px;padding:2px 7px;font-size:12px;font-weight:600;box-shadow:none;white-space:nowrap}.leaflet-tooltip.ctip:before{display:none}.cmap .leaflet-interactive{cursor:pointer}.cmap .tdark{filter:invert(1) hue-rotate(180deg) brightness(.9) contrast(.9)}
 .hint{display:none;font-size:12px;color:var(--muted);margin:0 0 4px}
@@ -1256,6 +1299,31 @@ DRAW.roundlist = (sec, host) => {
   draw();
 };
 
+DRAW.plan = (sec, host) => {
+  const d = sec.data, box = h("div", "plan", host);
+  h("p", "lead", box, "AI 分析完 " + d.total + " 場的數據之後，制定的目標和訓練計劃。");
+  const g = h("div", "pgoal", box); h("div", "k", g, d.goal.by + "打出一場"); h("div", "big", g, d.goal.score + " 以下"); h("div", "k", g, "最近 " + d.base.n + " 場平均 " + d.base.strokes + "，最好 " + d.base.best + "・" + d.goal.next);
+  h("h3", "", box, "每場只看兩個數字");
+  const t2 = h("div", "ptiles", box);
+  [["推桿", d.base.putts, d.check.putts + " 以下"], ["爆桿", d.base.blow + " 洞", d.check.blow + " 洞以下"]].forEach(([k, now, tg]) => { const t = h("div", "ptile", t2); h("div", "k", t, k); h("div", "v", t, tg); h("div", "k", t, "現在 " + now); });
+  const mk = (td, v, ok) => { td.textContent = v == null ? "—" : v; if (v != null) td.className = ok ? "ok" : "no"; };
+  const tb = h("table", "ptab", box), hr = h("tr", "", tb); ["", "球場", "總桿", "推桿", "爆桿"].forEach(x => h("th", "", hr, x));
+  const rows = d.after.length ? d.after : d.recent;
+  rows.forEach(r => { const tr = h("tr", "", tb); h("td", "", tr, r.date.slice(2).replaceAll("-", "/")); h("td", "", tr, r.short);
+    mk(h("td", "", tr), r.strokes, r.strokes <= d.goal.score); mk(h("td", "", tr), r.putts, r.putts <= d.check.putts); mk(h("td", "", tr), r.blow, r.blow <= d.check.blow); });
+  h("div", "cap", box, d.after.length ? "計劃開始後的 " + d.after.length + " 場，綠色是達標" : "計劃開始前最近 " + rows.length + " 場，綠色是達標。下一場起列在這裡");
+  h("h3", "", box, "只練兩件事");
+  const facts = ["每場三推 " + d.facts.three + " 洞", "每場打 " + d.facts.hy_n + " 次，" + d.facts.hy_bad + "% 打壞"];
+  d.train.forEach(([t, body], i) => { const c = h("div", "pcard", box); h("b", "num", c, String(i + 1)); const w = h("div", "", c); h("div", "t", w, t); h("div", "f", w, facts[i]); h("div", "b", w, body); });
+  h("h3", "", box, "上場只守一條");
+  const c = h("div", "pcard rule", box), w = h("div", "", c); h("div", "t", w, d.rule[0]); h("div", "b", w, d.rule[1]);
+  const bt = h("table", "ptab", box), bh = h("tr", "", bt); ["球桿", "選桿用（常態）", "打得好", "球數"].forEach(x => h("th", "", bh, x));
+  d.bag.forEach(b => { const tr = h("tr", "", bt), few = b.n < 30; h("td", "", tr, b.club); h("td", few ? "" : "strong", tr, few ? "累積中" : b.med); h("td", "", tr, few ? "—" : b.good); h("td", "", tr, b.n); });
+  h("div", "cap", box, "碼。不到 30 球的球桿先不下結論");
+  h("h3", "", box, "先放下的");
+  h("div", "plater", box, d.later.join("・"));
+};
+
 document.getElementById("meta").textContent = REPORT.meta;
 document.getElementById("h1").textContent = REPORT.title; document.title = REPORT.title;
 (REPORT.tabs || []).forEach(([href, label]) => { const a = h("a", href === REPORT.page ? "on" : "", document.getElementById("ptabs"), label); a.href = href; });
@@ -1283,7 +1351,7 @@ addEventListener("resize", () => { if (innerWidth === lastW) return; lastW = inn
 </script></body></html>
 """
 
-NAV_SHORT = {"rounds": "場次總表", "score-trend": "總桿", "handicap": "差點", "club-distance": "擊球距離", "score-par": "洞型", "putt-count": "推桿", "courses": "打過的球場",
+NAV_SHORT = {"rounds": "場次總表", "score-trend": "總桿", "handicap": "差點", "club-distance": "擊球距離", "score-par": "洞型", "putt-count": "推桿", "courses": "打過的球場", "plan": "訓練計劃",
              "putt-holes": "每月推桿", "club-recent": "球桿比較", "seq-cost": "失誤代價", "mishit-trend": "打壞比例", "mishit-club": "各桿打壞", "seq-club": "各桿成敗", "seq-chain": "連續失誤",
              "chip": "切球", "chip-once": "切一次上果嶺", "score-par-dist": "洞型分布", "length-par3": "三桿洞洞長", "length-par4": "四桿洞洞長", "length-par5": "五桿洞洞長", "blowup": "爆桿",
              "putt-trend": "推桿趨勢", "putt-share": "推桿佔比", "putt-par": "洞型推桿", "putt-approach": "上果嶺距離", "putt-course": "球場推桿"}
@@ -1296,8 +1364,9 @@ def main():
     meta = f"{n} 場（{first} 至 {last}）・{shots} 桿擊球紀錄・產生時間 {datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))):%Y-%m-%d %H:%M}"
     pages = [("index.html", "MI 高爾夫數據", MAIN, ["more.html", "更多分析（其餘 %d 張圖）→" % len(MORE)]),
              ("more.html", "MI 高爾夫數據", MORE, ["index.html", "← 回主頁"]),
-             ("courses.html", "MI 高爾夫數據", [section_courses], ["index.html", "← 回主頁"])]
-    tabs = [["index.html", "主畫面"], ["courses.html", "打過的球場"], ["more.html", "更多分析"]]
+             ("courses.html", "MI 高爾夫數據", [section_courses], ["index.html", "← 回主頁"]),
+             ("plan.html", "MI 高爾夫數據", [section_plan], ["index.html", "← 回主頁"])]
+    tabs = [["index.html", "主畫面"], ["courses.html", "打過的球場"], ["more.html", "更多分析"], ["plan.html", "訓練計劃"]]
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     for fname, title, sections, link in pages:
         secs = [f(con) for f in sections]
