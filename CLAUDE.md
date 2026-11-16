@@ -200,11 +200,16 @@ python3 scripts/build_report.py      # golf.db → reports/index.html（整頁�
 
 - **球場簡稱**：`data/raw/course_names.csv` 有三欄 `garmin_name,name_zh,short`（Garmin 英文名、中文全名、簡稱）。簡稱是台灣球友慣用的兩三個字（霧峰、南一、大崗山…），國外球場取重點字（Sky Lake、Legend Hill、Long Bien）。場次檔的 `course` 欄仍然存全名；`build_db.py` 把簡稱寫進 `rounds.course_short`。場次總表顯示簡稱，全名顯示在點開後的計分卡上方。**新球場第一次出現時，要同時補全名和簡稱**，沒補的話 `build_db.py` 會在「問題」列出來。
 
-## GitHub（2026-11-16 起，實驗中）
+## GitHub 是正本（2026-11-16 起）
 
-- Repository：`milai1102/mi_golf_task`（使用者建立）。整個專案放上去；用 GitHub Pages 當公開網站（網址 https://milai1102.github.io/mi_golf_task/ ）。GitHub Pages 的網頁任何人有網址都看得到，使用者已知並同意。
-- Pages 設定：從 `main` 分支根目錄發佈。根目錄的 `index.html` 只是轉址到 `reports/index.html`；`.nojekyll` 讓 GitHub 不要用 Jekyll 處理。
-- `.gitignore` 排除：`data/processed/`（衍生物）、`_to_delete/`、`Claude outputs/`、`.DS_Store`。
-- `reports/*.html` 是衍生物但**要進版控**，因為網站就是它。
-- 「新增一場」流程最後：重建報表 → commit → push，網站一兩分鐘後自動更新。
+- **正本在 GitHub**：`milai1102/mi_golf_task`（公開）。所有修改（彙整新場次、改圖表、改規則）都在 GitHub 的版本上做，改完 commit 並 push 到 `main`。使用者決定：「這個專案以 GitHub 為主，Mac 上的目錄為輔。」
+- **Mac 上的 `~/works/mi_golf_task` 是副本**（一個 git clone），只用來看和備份。Claude 不直接在上面改檔案；使用者要更新時執行 `git pull`。
+- Claude 的做法：每次工作先取得 GitHub 最新版（clone 或 pull），在那一份上跑 `python3 scripts/update.py`、改程式，檢查後 push。不需要連上 Mac 的資料夾。
+- 唯一需要使用者電腦的步驟：抓 Garmin 新資料，要用 Claude 桌面版內建瀏覽器裡的 Garmin 登入狀態（只用瀏覽器，不用資料夾）。抓到的資料直接寫進 GitHub 版本的 `data/raw/parts/`。
+- 如果使用者自己在 Mac 上改了東西並 push，Claude 下次工作前先 pull。兩邊不一致時以 GitHub 為準；Mac 上有未 push 的修改要先問使用者。
+- **網站**：GitHub Pages，網址 https://milai1102.github.io/mi_golf_task/ ，從 `main` 分支根目錄發佈，push 後一兩分鐘自動更新。任何人有網址都看得到，使用者已知並同意。根目錄的 `index.html` 只是轉址到 `reports/index.html`；`.nojekyll` 讓 GitHub 不要用 Jekyll 處理。
+- `.gitignore` 排除：`data/processed/`（衍生物，每次重建）、`_to_delete/`、`Claude outputs/`、`.DS_Store`。
+- `reports/*.html` 是衍生物但**要進版控**，因為網站就是它。重建報表後一定要連同 `reports/` 一起 commit。
+- 「新增一場」流程最後：重建報表 → 截圖檢查 → commit → push → 確認網站更新。
 - 不要把密碼、token、使用者 email 寫進任何會進版控的檔案。
+- 上面各節提到「此環境不能刪除資料夾裡的檔案」「資料夾是掛載的，SQLite 不能直接建檔」是指在 Mac 掛載資料夾上工作時的限制；在 GitHub 的 clone 上工作沒有這些限制（`build_db.py` 的暫存區做法照樣可用）。
