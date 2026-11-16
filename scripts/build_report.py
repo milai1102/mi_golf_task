@@ -538,7 +538,7 @@ def section_courses(con):
         lays = [{"cid": L["cid"], "label": L["label"], "holes": [L["holes"][k] for k in sorted(L["holes"])]} for L in c["layouts"].values()]
         out.append({"short": c["short"], "name": c["name"], "n": len(c["rounds"]), "last": c["last"], "layouts": lays})
     note = "每一洞把歷次的擊球路線疊在同一張圖上，最近一次最清楚，越早的越淡。紅＝一號木、橘＝鐵木桿、藍＝鐵桿、細白線＝切球桿。球場輪廓是依 Garmin 地圖重新描的示意圖。"
-    return {"id": "courses", "title": "球場紀錄", "note": note, "kind": "courses", "data": out, "table": {"head": [], "rows": []}}
+    return {"id": "courses", "title": "打過的球場", "note": note, "kind": "courses", "data": out, "table": {"head": [], "rows": []}}
 
 def section_roundlist(con):
     tags = {"short_course": "短球場", "partial": "未打完", "nine": "9 洞"}; out = []
@@ -741,7 +741,7 @@ th{color:var(--ink2);font-weight:500}
 .tabs{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px}.chart .legend svg,.chart .sclg svg{display:inline-block;width:auto;height:auto;flex:none}.panel .legend{margin-top:10px}.panel{padding:6px 0 4px}
 .maps{display:grid;gap:10px;margin-top:8px}.maps figure{margin:0;background:#111110;border-radius:10px;padding:6px 4px 4px;min-width:0}.maps figcaption{font-size:12px;color:#c3c2b7;text-align:center;padding-bottom:2px;white-space:nowrap}
 .maps svg{display:block;width:100%}.maps.strip{width:calc(100vw - 46px);display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;gap:8px;padding-bottom:6px}.maps.strip figure{flex:0 0 calc((100% - (var(--per) - 1) * 8px) / var(--per));scroll-snap-align:start}.sub{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:12px;color:var(--ink2);margin-top:6px}.sub .fchip{font-size:12px;padding:2px 10px}
-.toplinks{display:flex;gap:8px;margin:10px 0 0}.toplinks a{font-size:14px;font-weight:600;color:var(--surface);background:var(--ink);text-decoration:none;border-radius:999px;padding:5px 16px}
+nav a.page{font-weight:600;color:var(--surface);background:var(--ink);border-color:var(--ink)}nav a.page:hover{color:var(--surface)}
 .maps.strip.big{width:auto}.maps.strip.big figure{padding:10px 8px 8px}.maps.strip.big figcaption{font-size:15px;font-weight:600;color:#f0efec}
 .cstat{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 14px;font-size:12px;color:#c3c2b7;padding:2px 0 6px}.cstat b{color:#f0efec;font-weight:600}
 .cplays{width:100%;margin-top:6px;font-size:12px;color:#c3c2b7}.cplays td{padding:3px 4px;text-align:center;border-bottom:1px solid #2c2c2a;white-space:nowrap}.cplays td.bad{color:#f06a6a;font-weight:600}.cplays td.good{color:#2fbf4f;font-weight:600}
@@ -754,12 +754,13 @@ details{overflow-x:auto}
 nav{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px}nav a{flex:none;white-space:nowrap}
 section{padding:14px 12px 12px;margin-top:14px;border-radius:10px}section h2{font-size:16px}
 .hint{display:block}
+.filters,.sub.holes{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px}.filters .fchip,.sub.holes .fchip{flex:none}
 .rl{font-size:14px}.rl th,.rl td{padding:9px 4px;white-space:nowrap}.rl td.course{white-space:normal;line-height:1.35}.rl td.arrow,.rl>tr>th:last-child{display:none}
 .rl tr.detail>td{padding:4px 0 12px 0;white-space:normal}.sc{padding:4px 2px 0}.m{width:23px;height:23px;font-size:14px;border-width:1.5px}.m.dbl,.m.blow,.m.eagle{outline-width:1.5px;outline-offset:1.5px}.scg .hn,.scg .pr{font-size:12px}.dots{font-size:11px;letter-spacing:0}.rt{font-size:12px}.rt td,.rt th{padding:5px 3px}.rt td.shots{white-space:normal}.chip{padding:0 5px;margin:1px 3px 1px 0;font-size:11px}
 .legend{gap:6px 14px}th,td{padding:4px 8px}
 }
 </style></head><body><div class="wrap">
-<header><h1 id="h1"></h1><p id="meta"></p><p class="toplinks" id="top"></p></header><nav id="nav"></nav><main id="main"></main><p class="morelink"><a id="link"></a></p></div>
+<header><h1 id="h1"></h1><p id="meta"></p></header><nav id="nav"></nav><main id="main"></main><p class="morelink"><a id="link"></a></p></div>
 <script>
 const REPORT = __DATA__;
 const NS = "http://www.w3.org/2000/svg";
@@ -1180,14 +1181,13 @@ DRAW.roundlist = (sec, host) => {
 
 document.getElementById("meta").textContent = REPORT.meta;
 document.getElementById("h1").textContent = REPORT.title; document.title = REPORT.title;
-(REPORT.top || []).forEach(([href, label]) => { const a = h("a", "", document.getElementById("top"), label); a.href = href; });
 { const a = document.getElementById("link"); a.textContent = REPORT.link[1]; a.href = REPORT.link[0]; }
 const main = document.getElementById("main"), nav = document.getElementById("nav");
 function render() {
   main.replaceChildren(); nav.replaceChildren();
-  nav.style.display = REPORT.sections.length > 1 ? "" : "none";
+  const pages = () => (REPORT.top || []).forEach(([href, label]) => { const a = h("a", "page", nav, label); a.href = href; });
   for (const sec of REPORT.sections) {
-    const a = h("a", "", nav, sec.title); a.href = "#" + sec.id;
+    if (REPORT.sections.length > 1) { const a = h("a", "", nav, sec.short || sec.title); a.href = "#" + sec.id; }
     const s = h("section", "", main); s.id = sec.id;
     h("h2", "", s, sec.title);
     const host = h("div", "chart", s);
@@ -1198,12 +1198,18 @@ function render() {
     sec.table.head.forEach(label => h("th", "", hr, label));
     sec.table.rows.forEach(r => { const tr = h("tr", "", t); r.forEach(v => h("td", "", tr, v)); });
   }
+  pages();
 }
 render();
 let rt, lastW = innerWidth;   // 手機捲動時網址列收合也會觸發 resize，只有寬度真的變了才重畫
 addEventListener("resize", () => { if (innerWidth === lastW) return; lastW = innerWidth; clearTimeout(rt); rt = setTimeout(render, 150); });
 </script></body></html>
 """
+
+NAV_SHORT = {"rounds": "場次總表", "score-trend": "總桿", "handicap": "差點", "club-distance": "擊球距離", "score-par": "洞型", "putt-count": "推桿", "courses": "打過的球場",
+             "putt-holes": "每月推桿", "club-recent": "球桿比較", "seq-cost": "失誤代價", "mishit-trend": "打壞比例", "mishit-club": "各桿打壞", "seq-club": "各桿成敗", "seq-chain": "連續失誤",
+             "chip": "切球", "chip-once": "切一次上果嶺", "score-par-dist": "洞型分布", "length-par3": "三桿洞洞長", "length-par4": "四桿洞洞長", "length-par5": "五桿洞洞長", "blowup": "爆桿",
+             "putt-trend": "推桿趨勢", "putt-share": "推桿佔比", "putt-par": "洞型推桿", "putt-approach": "上果嶺距離", "putt-course": "球場推桿"}
 
 def main():
     tmp = os.path.join(tempfile.mkdtemp(), "g.db"); shutil.copyfile(DB, tmp)   # 掛載資料夾上直接開 SQLite 會出錯
@@ -1213,11 +1219,12 @@ def main():
     meta = f"{n} 場（{first} 至 {last}）・{shots} 桿擊球紀錄・產生時間 {datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))):%Y-%m-%d %H:%M}"
     pages = [("index.html", "MI 高爾夫數據", MAIN, ["more.html", "更多分析（其餘 %d 張圖）→" % len(MORE)]),
              ("more.html", "MI 高爾夫數據：更多分析", MORE, ["index.html", "← 回主頁"]),
-             ("courses.html", "MI 高爾夫數據：球場紀錄", [section_courses], ["index.html", "← 回主頁"])]
-    top = {"index.html": [["courses.html", "球場紀錄"], ["more.html", "更多分析"]], "more.html": [["index.html", "主頁"], ["courses.html", "球場紀錄"]], "courses.html": [["index.html", "主頁"], ["more.html", "更多分析"]]}
+             ("courses.html", "MI 高爾夫數據：打過的球場", [section_courses], ["index.html", "← 回主頁"])]
+    top = {"index.html": [["courses.html", "打過的球場"], ["more.html", "更多分析"]], "more.html": [["index.html", "主頁"], ["courses.html", "打過的球場"]], "courses.html": [["index.html", "主頁"], ["more.html", "更多分析"]]}
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     for fname, title, sections, link in pages:
         secs = [f(con) for f in sections]
+        for x in secs: x["short"] = NAV_SHORT.get(x["id"], x["title"])          # 導覽列只放簡稱，不放說明
         report = {"meta": meta, "title": title, "link": link, "success": SUCCESS, "sections": secs, "top": top[fname], "geo": GEO if any(x["kind"] in ("roundlist", "courses") for x in secs) else {}}
         path = os.path.join(os.path.dirname(OUT), fname)
         open(path, "w", encoding="utf-8").write(PAGE.replace("__DATA__", json.dumps(report, ensure_ascii=False)))
