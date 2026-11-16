@@ -7,3 +7,6 @@ _to_delete/
 __pycache__/
 *.pyc
 Claude outputs/
+
+# 球場每洞的地圖（Garmin 的圖，不放進公開的 repository；存在 Mac 的副本裡）
+data/course_maps/
