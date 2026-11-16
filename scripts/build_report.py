@@ -593,7 +593,7 @@ def section_courses(con):
 PLAN_START = "2026-11-16"          # 計劃定案的日期，這一天之後的場次才算「計劃開始後」
 PLAN_GOAL = {"score": 95, "by": "2026 年底前", "next": "明年第一季 90"}
 PLAN_BLOW = 1                      # 每場爆桿幾洞以下（推桿的門檻用 TARGET_ROUND_PUTTS）
-PLAN_BAG = ["鐵木桿", "6鐵", "8鐵", "P杆"]
+PLAN_BAG = [["鐵木桿", "120 碼以上"], ["6鐵", "長草"], ["8鐵", "100 到 120"], ["P杆", "80 到 100"], ["A杆", "80 以內"]]   # 選桿表：球桿、用在哪個距離（使用者決定，減法原則）
 PLAN_TRAIN = [["長推", "三推 7 洞以下", "下場前在練習果嶺推 8 到 15 步"],          # 標題、目標、怎麼練（都要短）
               ["鐵木桿", "打壞 10% 以下", "練習場模擬球洞，重心放這一支"],
               ["80 碼內", "一次上果嶺 85%", "隔天練切球，多練 50 到 80 碼"],
@@ -612,9 +612,9 @@ def section_plan(con):
     ids = [rid for rid, d, sh, st in rounds if d <= PLAN_START][:RECENT_N]; q = ",".join("?" * len(ids))
     med_all = lambda club: sorted(x[0] for x in con.execute("SELECT distance_yd FROM shots WHERE club=? AND to_pin_end_m>0 AND distance_yd IS NOT NULL", (club,)))
     bag = []
-    for club in PLAN_BAG:
+    for club, use in PLAN_BAG:
         d = med_all(club)
-        bag.append({"club": club, "n": len(d), "med": d[(len(d) - 1) // 2] if d else None, "good": d[int((len(d) - 1) * .75)] if d else None})
+        bag.append({"club": club, "use": use, "chip": club == "A杆", "n": len(d), "med": d[(len(d) - 1) // 2] if d else None, "good": d[int((len(d) - 1) * .75)] if d else None})
     hy = [x[0] for x in con.execute(f"SELECT distance_yd FROM shots WHERE club='鐵木桿' AND distance_yd IS NOT NULL AND round_id IN ({q})", ids)]
     hmed = next(b["med"] for b in bag if b["club"] == "鐵木桿")
     facts = {"three": avg("three", base), "hy_n": round(len(hy) / max(1, len(ids)), 1), "hy_bad": round(100 * sum(x < MISHIT_RATIO * hmed for x in hy) / max(1, len(hy)))}
@@ -1328,9 +1328,9 @@ DRAW.plan = (sec, host) => {
   d.train.forEach(([t, goal, how], i) => { const c = h("div", "pcard", box); h("b", "num", c, String(i + 1)); const w = h("div", "", c); const r = h("div", "t", w, t + "　"); h("span", "tg", r, goal); h("div", "f", w, "現在 " + d.factlist[i]); h("div", "b", w, how); });
   h("h3", "", box, "上場只想這幾件事");
   const c = h("div", "pcard rule", box), ol = h("ol", "", c); d.rule.forEach(x => h("li", "", ol, x));
-  const bt = h("table", "ptab", box), bh = h("tr", "", bt); ["球桿", "選桿用（常態）", "打得好", "球數"].forEach(x => h("th", "", bh, x));
-  d.bag.forEach(b => { const tr = h("tr", "", bt), few = b.n < 30; h("td", "", tr, b.club); h("td", few ? "" : "strong", tr, few ? "累積中" : b.med); h("td", "", tr, few ? "—" : b.good); h("td", "", tr, b.n); });
-  h("div", "cap", box, "碼。不到 30 球的球桿先不下結論");
+  const bt = h("table", "ptab", box), bh = h("tr", "", bt); ["離旗桿", "球桿", "常態", "打得好"].forEach(x => h("th", "", bh, x));
+  d.bag.forEach(b => { const tr = h("tr", "", bt), few = b.n < 30; h("td", "", tr, b.use); h("td", "strong", tr, b.club); h("td", "", tr, b.chip ? "—" : few ? "累積中" : b.med); h("td", "", tr, b.chip || few ? "—" : b.good); });
+  h("div", "cap", box, "碼。常態與打得好是全揮桿的距離");
   h("h3", "", box, "先放下的");
   h("div", "plater", box, d.later.join("・"));
 };
