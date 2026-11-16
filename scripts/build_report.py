@@ -481,6 +481,38 @@ def fairway_offset(s, e, meters, fairways):
     _, lo, hi = best
     return round((hi - lo) * ypp), round((lo + hi) / 2 * ypp)
 
+_LAYOUT_ZH = {"East": "東", "West": "西", "South": "南", "North": "北", "Center": "中", "Mountain": "青山", "Lake": "綠水", "Left": "左", "Right": "右"}
+_LAYOUT_OVERRIDE = None
+
+def layout_labels(layout):
+    """Garmin 的分區名稱 → 這張計分卡各九洞的區名（一張 18 洞的卡如果是 C/A 這種組合就回傳兩個）。可用 data/layout_names.csv（layout,label）覆寫，label 用 / 分隔前後九。"""
+    global _LAYOUT_OVERRIDE
+    if _LAYOUT_OVERRIDE is None:
+        p = os.path.join(ROOT, "data/layout_names.csv")
+        _LAYOUT_OVERRIDE = {r["layout"]: r["label"] for r in csv.DictReader(open(p, encoding="utf-8-sig"))} if os.path.exists(p) else {}
+    if layout in _LAYOUT_OVERRIDE: return [x.strip() for x in _LAYOUT_OVERRIDE[layout].split("/") if x.strip()]
+    if "~" not in layout: return []
+    suf = layout.split("~", 1)[1].split("+")[0].strip()                 # 「South Left+… ~ North Right」只取前面
+    out = []
+    for part in suf.split("/"):
+        w = part.split()
+        if len(w) > 1 and w[-1] in ("Left", "Right"): w = w[:-1]         # 尾巴的 Left/Right 是果嶺或發球台的左右，不是區名
+        out.append("".join(_LAYOUT_ZH.get(x, x) for x in w) if all(x in _LAYOUT_ZH for x in w) else " ".join(w))
+    return out
+
+def round_parts(fname):
+    """這一場每一洞屬於哪一區（組合球場才有意義）。回傳 (每洞區名的 list, 組合名稱如「青山＋綠水」)；不是組合就回傳 (None, "")。"""
+    rows = list(csv.DictReader(open(os.path.join(ROOT, "data/rounds", fname), encoding="utf-8-sig")))
+    seqs = {}
+    for r in rows: seqs.setdefault(r["garmin_scorecard_id"], {})[int(r["seq"])] = r["layout"]
+    lab = {}
+    for sid, d in seqs.items():
+        L = layout_labels(next(iter(d.values()))); ss = sorted(d)
+        for i, q in enumerate(ss): lab[q] = (L[1] if len(L) == 2 and len(ss) > 9 and i >= 9 else L[0]) if L else ""
+    per = [lab[q] for q in sorted(lab)]; groups = [x for i, x in enumerate(per) if i == 0 or x != per[i - 1]]
+    if len(groups) < 2 or not all(groups): return None, ""
+    return per, "＋".join(groups)
+
 def round_gps(fname):
     """讀一場的擊球座標；沒有就回傳 None。前九後九是兩張計分卡、兩個球場代碼，洞號會重複，所以每一洞都帶自己的球場代碼和這一場的第幾洞。"""
     rows = list(csv.DictReader(open(os.path.join(ROOT, "data/rounds", fname), encoding="utf-8-sig")))
@@ -525,7 +557,7 @@ def section_courses(con):
         cid_layout = {}
         for sid, lay in layout.items():
             p = os.path.join(ROOT, "data/raw/gps", f"{sid}.txt")
-            if os.path.exists(p): cid_layout[open(p, encoding="utf-8").readline().split("|")[1]] = lay.split("~")[1].strip() if "~" in lay else ""
+            if os.path.exists(p): cid_layout[open(p, encoding="utf-8").readline().split("|")[1]] = "／".join(layout_labels(lay))
         c = courses.setdefault(short, {"name": course, "short": short, "layouts": {}, "last": date, "rounds": set()})
         c["last"] = date; c["rounds"].add(rid)
         for H in g["holes"]:
@@ -549,7 +581,7 @@ def section_roundlist(con):
             holes.append([hole, par, yd, [[c or "?", d] for c, d in shots], putts, src == "estimated", st])
         pv = [h[4] for h in holes if h[4] is not None]
         out.append({"date": date, "course": course, "short": short, "tag": tags.get(cat, ""), "cat": {"full_18": "full", "short_course": "short"}.get(cat, "partial"), "n": n, "strokes": strokes, "over": over, "hcp": diff,
-                    "putts": sum(pv) if pv else None, "est": any(h[5] for h in holes), "holes": holes, "gps": round_gps(fname)})
+                    "putts": sum(pv) if pv else None, "est": any(h[5] for h in holes), "holes": holes, "gps": round_gps(fname), "parts": round_parts(fname)[0], "combo": round_parts(fname)[1]})
     note = "由新到舊排列，預設只列完整打完 18 洞的場次，上方按鈕可加入未打完與短球場的場次。點任一場展開 18 洞明細。" \
            "擊球欄是被手錶記錄到的擊球，依序為球桿與距離（碼）。沒有手錶紀錄的洞，推桿數由「總桿 − 記錄擊球 − 罰桿」推算。"
     return {"id": "rounds", "title": "場次總表", "note": note, "kind": "roundlist", "data": out, "table": {"head": [], "rows": []}}
@@ -710,7 +742,7 @@ select{font:inherit;font-size:14px;padding:6px 10px;border:1px solid var(--axis)
 .rt td.bad{color:#d03b3b;font-weight:600}.rt td.good{color:#0c8a0c;font-weight:600}.rt tr.tot td{font-weight:600;border-top:1px solid var(--axis)}
 .rl{width:100%}.rl th,.rl td{text-align:center;padding:8px 8px}.rl td.course,.rl th:nth-child(2){text-align:left}.rl td.strong{font-weight:600}.rl td.zero{color:var(--up);font-weight:600}
 .rl tr.row{cursor:pointer}.rl tr.row:hover{background:var(--page)}.rl tr.more{display:none}.rl.all tr.more{display:table-row}.rl td.arrow{color:var(--muted);width:28px}
-.rl tr.detail>td{padding:4px 0 16px 24px;background:var(--page)}.tag{font-size:11px;color:var(--ink2);border:1px solid var(--border);border-radius:999px;padding:0 7px;margin-left:8px}
+.rl tr.detail>td{padding:4px 0 16px 24px;background:var(--page)}.tag{white-space:nowrap;font-size:11px;color:var(--ink2);border:1px solid var(--border);border-radius:999px;padding:0 7px;margin-left:8px}
 .filters{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 10px}
 .fchip{font:inherit;font-size:13px;padding:4px 12px;border:1px solid var(--axis);border-radius:999px;background:transparent;color:var(--muted);cursor:pointer}
 .fchip.on{background:var(--ink);color:var(--surface);border-color:var(--ink)}
@@ -728,7 +760,7 @@ th{color:var(--ink2);font-weight:500}
 .scname{font-size:13px;color:var(--ink2);padding:8px 0 0}
 .sc{max-width:600px;padding:6px 8px 0 0}
 .scg{display:grid;grid-template-columns:repeat(9,1fr) 1.25fr;justify-items:center;align-items:center;row-gap:4px;padding:10px 0 8px;border-bottom:1px solid var(--grid)}
-.scg .hn{color:var(--muted);font-size:13px}.scg .pr{color:var(--ink2);font-size:13px;margin-bottom:6px}
+.scg .hn{color:var(--muted);font-size:13px;white-space:nowrap}.scg .pr{color:var(--ink2);font-size:13px;margin-bottom:6px}
 .scg .s{display:flex;flex-direction:column;align-items:center}
 .m{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;font-size:16px;font-weight:600;font-style:normal;border:2px solid transparent;font-variant-numeric:tabular-nums}
 .m.bogey{border-color:#d9a13a}.m.dbl{border-color:var(--down);outline:2px solid var(--down);outline-offset:2px}
@@ -1069,7 +1101,7 @@ DRAW.roundlist = (sec, host) => {
   const card = r => { const box = document.createElement("div"); box.className = "sc";
     for (let i = 0; i < r.holes.length; i += 9) { const part = r.holes.slice(i, i + 9), g = h("div", "scg", box), pad = cls => { for (let k = part.length; k < 9; k++) h("div", cls, g, ""); };
       const sum = f => part.reduce((a, x) => a + f(x), 0);
-      part.forEach(x => h("div", "hn", g, x[0])); pad("hn"); h("div", "hn", g, r.holes.length > 9 ? (i === 0 ? "前九" : i === 9 ? "後九" : "") : "合計");
+      part.forEach(x => h("div", "hn", g, x[0])); pad("hn"); h("div", "hn", g, r.parts && r.parts[i] ? r.parts[i] : r.holes.length > 9 ? (i === 0 ? "前九" : i === 9 ? "後九" : "") : "合計");
       part.forEach(x => h("div", "pr", g, x[1])); pad("pr"); h("div", "pr", g, sum(x => x[1]));
       part.forEach(x => { const c = h("div", "s", g); h("span", "m " + mark(x[6] - x[1]), c, x[6]); h("div", "dots" + (x[4] >= 3 ? " three" : ""), c, x[4] == null ? "" : "•".repeat(x[4])); }); pad("s");
       const t = h("div", "s", g); h("span", "m tot", t, sum(x => x[6])); h("div", "dots", t, part.every(x => x[4] != null) ? sum(x => x[4]) + " 推" : ""); }
@@ -1119,7 +1151,7 @@ DRAW.roundlist = (sec, host) => {
   // ----- 球道圖：一次看幾洞，用 Garmin 地圖描出來的輪廓加上每一桿的路線 -----
   const MAPC = { outline: "#2f5d2a", tree: "#1c3a1e", fairway: "#58963f", water: "#3c6edc", sand: "#e1cdaa", green: "#8ccd6e" }, SHOTC = { d: "#ff5a5a", w: "#ffa51f", i: "#5aa9ff", c: "#ffffff" };
   const holeMap = (r, H, hpx, brief) => { const geo = (REPORT.geo[H.cid] || {})[H.h] || {}, fig = document.createElement("figure"), st = (r.holes[H.n - 1] || [])[6];
-    const par = H.par || (r.holes[H.n - 1] || [])[1]; h("figcaption", "", fig, brief ? `${H.n}　P${par}` + (st ? `　${st}` : "") : `第 ${H.n} 洞　Par ${par}` + (st ? `　${st} 桿` : ""));
+    const par = H.par || (r.holes[H.n - 1] || [])[1], zone = r.parts && r.parts[H.n - 1] ? `　${r.parts[H.n - 1]} ${H.h}` : ""; h("figcaption", "", fig, brief ? `${H.n}　P${par}` + (st ? `　${st}` : "") : (zone && NARROW() ? `${H.n}${zone}　P${par}` : `第 ${H.n} 洞${zone}　Par ${par}`) + (st ? `　${st} 桿` : ""));
     const pts = [].concat(...(geo.outline || []), ...H.shots.map(s => [[s[2], s[3]], [s[4], s[5]]]), H.pin ? [H.pin] : []), xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
     if (!pts.length) return fig;
     const pad = geo.outline ? 10 : 40, x0 = Math.min(...xs) - pad, y0 = Math.min(...ys) - pad, w = Math.max(...xs) - x0 + pad, hh = Math.max(...ys) - y0 + pad, k = Math.max(w, hh) / 300;
@@ -1164,14 +1196,16 @@ DRAW.roundlist = (sec, host) => {
     ["日期", "球場", "總桿", "差點", "爆桿", "推桿", ""].forEach(x => h("th", "", hr, x));
     const rows = sec.data.filter(r => on[r.cat]);
     rows.slice(0, all ? rows.length : SHOW).forEach(r => { const tr = h("tr", "row", t);
-      h("td", "", tr, NARROW() ? r.date.slice(2).replace(/-/g, "/") : r.date); const c = h("td", "course", tr, r.short);   // 總表用簡稱，全名在點開後的計分卡上 if (r.tag) h("span", "tag", c, r.tag); if (r.n !== 18) h("span", "tag", c, r.n + " 洞");   // 18 洞是預設，不是 18 洞才標出來
+      h("td", "", tr, NARROW() ? r.date.slice(2).replace(/-/g, "/") : r.date); const c = h("td", "course", tr, r.short); if (r.tag) h("span", "tag", c, r.tag); if (r.combo) h("span", "tag", c, r.combo); if (r.n !== 18) h("span", "tag", c, r.n + " 洞");   // 18 洞是預設，不是 18 洞才標出來
       h("td", "strong", tr, r.strokes); h("td", "", tr, r.hcp == null ? "" : r.hcp.toFixed(1)); const blow = r.holes.filter(x => x[6] - x[1] >= 3).length;   // 爆洞：+3 以上的洞數，0 用綠色
       h("td", blow ? "" : "zero", tr, blow); h("td", "", tr, r.putts == null ? "" : r.putts);
       const arrow = h("td", "arrow", tr, "▸");
       tr.addEventListener("click", () => { const nx = tr.nextSibling;
         if (nx && nx.classList.contains("detail")) { nx.remove(); arrow.textContent = "▸"; return; }
+        t.querySelectorAll("tr.detail").forEach(d => d.remove()); t.querySelectorAll("td.arrow").forEach(a => a.textContent = "▸");   // 一次只展開一場
+        const top0 = tr.getBoundingClientRect().top;
         const dr = document.createElement("tr"); dr.className = "detail"; const td = h("td", "", dr); td.colSpan = 7; td.appendChild(detail(r));
-        tr.after(dr); arrow.textContent = "▾"; }); });
+        tr.after(dr); arrow.textContent = "▾"; scrollBy(0, tr.getBoundingClientRect().top - top0); }); });
     more.style.display = rows.length > SHOW ? "" : "none"; more.textContent = all ? `只顯示最近 ${SHOW} 場` : `顯示全部 ${rows.length} 場`; };
   cats.forEach(([key, label]) => { const n = sec.data.filter(r => r.cat === key).length, b = h("button", "fchip" + (on[key] ? " on" : ""), bar, `${label} ${n}`);
     b.addEventListener("click", () => { on[key] = !on[key]; b.classList.toggle("on", on[key]); draw(); }); });
