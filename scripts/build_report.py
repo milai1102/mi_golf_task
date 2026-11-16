@@ -778,7 +778,7 @@ th{color:var(--ink2);font-weight:500}
 .dots.three,.sclg b.three{color:var(--down);font-weight:700}.sclg b.three{letter-spacing:1px}
 .sclg{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--ink2);padding:10px 0 2px}.sclg span{display:inline-flex;align-items:center;gap:7px}.sclg .m{width:12px;height:12px;border-width:1.5px;outline-width:1.5px;outline-offset:1.5px}
 .tabs{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px}.chart .legend svg,.chart .sclg svg{display:inline-block;width:auto;height:auto;flex:none}.panel .legend{margin-top:10px}.panel{padding:6px 0 4px}
-.maps{display:grid;gap:10px;margin-top:8px}.maps figure{margin:0;background:#111110;border-radius:10px;padding:6px 4px 4px;min-width:0}.maps figcaption{font-size:12px;color:#c3c2b7;text-align:center;padding-bottom:2px;white-space:nowrap}
+.maps{display:grid;gap:10px;margin-top:8px}.maps figure{margin:0;background:#0c0c0b;border-radius:10px;padding:6px 4px 4px;min-width:0}.maps figcaption{font-size:12px;color:#c3c2b7;text-align:center;padding-bottom:2px;white-space:nowrap}
 .maps svg{display:block;width:100%}.maps.strip{width:calc(100vw - 46px);display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;gap:8px;padding-bottom:6px}.maps.strip figure{flex:0 0 calc((100% - (var(--per) - 1) * 8px) / var(--per));scroll-snap-align:start}.sub{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:12px;color:var(--ink2);margin-top:6px}.sub .fchip{font-size:12px;padding:2px 10px}
 .ptabs{display:flex;margin:16px 0 4px;border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:4px;gap:4px}.ptabs a{flex:1;text-align:center;font-size:15px;font-weight:600;color:var(--ink2);text-decoration:none;padding:9px 6px;border-radius:9px;white-space:nowrap}.ptabs a.on{background:var(--ink);color:var(--surface)}
 nav{margin:10px 0 0}nav a{font-size:12px;padding:3px 10px}
@@ -801,7 +801,10 @@ section{padding:14px 12px 12px;margin-top:14px;border-radius:10px}section h2{fon
 .legend{gap:6px 14px}th,td{padding:4px 8px}
 }
 </style></head><body><div class="wrap">
-<header><h1 id="h1"></h1><p id="meta"></p></header><div class="ptabs" id="ptabs"></div><nav id="nav"></nav><main id="main"></main><p class="morelink"><a id="link"></a></p></div>
+<header><h1 id="h1"></h1><p id="meta"></p></header><div class="ptabs" id="ptabs"></div><svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<pattern id="pFw" width="14" height="14" patternUnits="userSpaceOnUse" patternTransform="rotate(40)"><rect width="14" height="14" fill="#7fc95a"/><rect width="7" height="14" fill="#8ed667"/></pattern>
+<pattern id="pTree" width="22" height="22" patternUnits="userSpaceOnUse"><rect width="22" height="22" fill="#14351b"/><circle cx="6" cy="6" r="5.2" fill="#1f5128"/><circle cx="4.8" cy="4.8" r="2.4" fill="#2c6a35"/><circle cx="17" cy="16" r="5.6" fill="#1b4723"/><circle cx="15.8" cy="14.8" r="2.6" fill="#2a6332"/><circle cx="17" cy="4" r="3.2" fill="#193f20"/><circle cx="5" cy="17" r="3.4" fill="#1d4a25"/></pattern>
+</defs></svg><nav id="nav"></nav><main id="main"></main><p class="morelink"><a id="link"></a></p></div>
 <script>
 const REPORT = __DATA__;
 const NS = "http://www.w3.org/2000/svg";
@@ -822,6 +825,10 @@ const NARROW = () => innerWidth <= 640;
 // 寬度不夠時：圖照 min 寬度畫（字不縮小），外框改成可以左右滑動
 const wide = (host, min, mobile) => { const cw = host.clientWidth; if (cw >= min) return cw;
   const w = mobile || min; host.classList.add("scroll"); host.style.setProperty("--w", w + "px"); return w; };
+// 球場示意圖的畫法：長草是底色，樹林用深色加樹冠的圓點，球道用淺色斜條紋加亮邊，果嶺最亮，沙坑米色，水藍色
+const COURSE_STYLE = { outline: { fill: "#4a8a3c" }, tree: { fill: "url(#pTree)", stroke: "#14351b", "stroke-width": 3, "stroke-linejoin": "round" }, water: { fill: "#3d8fe6", stroke: "#8cc4ff", "stroke-width": 1.5 },
+  fairway: { fill: "url(#pFw)", stroke: "#c9f0a2", "stroke-width": 1.6, "stroke-linejoin": "round" }, sand: { fill: "#f1e2b4", stroke: "#b9a36a", "stroke-width": 1 }, green: { fill: "#b5ec83", stroke: "#e6ffc9", "stroke-width": 1.4, "stroke-linejoin": "round" } };
+const drawCourse = (svg, geo) => ["outline", "tree", "fairway", "water", "sand", "green"].forEach(key => (geo[key] || []).forEach(p => el("polygon", Object.assign({ points: p.map(q => q.join(",")).join(" ") }, COURSE_STYLE[key]), svg)));
 const DRAW = {
   box(sec, host) {
     const d = sec.data, W = wide(host, 560, 1000), H = 600, m = { l: 104, r: 34, t: 12, b: 136 };
@@ -1082,7 +1089,7 @@ DRAW.courses = (sec, host) => {
     const pts = []; (geo.outline || []).forEach(p => pts.push(...p)); P.forEach(p => { p.shots.forEach(s => pts.push([s[2], s[3]], [s[4], s[5]])); if (p.pin) pts.push(p.pin); }); const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
     if (pts.length) { const pad = geo.outline ? 10 : 40, x0 = Math.min(...xs) - pad, y0 = Math.min(...ys) - pad, w = Math.max(...xs) - x0 + pad, hh = Math.max(...ys) - y0 + pad, k = Math.max(w, hh) / 330;
       const svg = el("svg", { viewBox: `${x0} ${y0} ${w} ${hh}`, style: `height:${NARROW() ? 470 : 520}px`, preserveAspectRatio: "xMidYMid meet" }, f);
-      ["outline", "tree", "fairway", "water", "sand", "green"].forEach(key => (geo[key] || []).forEach(p => el("polygon", { points: p.map(q => q.join(",")).join(" "), fill: MAPC[key] }, svg)));
+      drawCourse(svg, geo);
       P.forEach((p, i) => { const op = P.length === 1 ? 1 : 0.3 + 0.7 * i / (P.length - 1);      // 越新的越清楚
         p.shots.forEach(s => { const c = SHOTC[s[1]], thin = s[1] === "c";
           el("line", { x1: s[2], y1: s[3], x2: s[4], y2: s[5], stroke: c, "stroke-width": (thin ? 1.1 : 2.2) * k, "stroke-opacity": (thin ? 0.6 : 1) * op, "stroke-linecap": "round" }, svg);
@@ -1165,7 +1172,7 @@ DRAW.roundlist = (sec, host) => {
     if (!pts.length) return fig;
     const pad = geo.outline ? 10 : 40, x0 = Math.min(...xs) - pad, y0 = Math.min(...ys) - pad, w = Math.max(...xs) - x0 + pad, hh = Math.max(...ys) - y0 + pad, k = Math.max(w, hh) / 300;
     const svg = el("svg", { viewBox: `${x0} ${y0} ${w} ${hh}`, style: `height:${hpx}px`, preserveAspectRatio: "xMidYMid meet" }, fig);
-    ["outline", "tree", "fairway", "water", "sand", "green"].forEach(key => (geo[key] || []).forEach(p => el("polygon", { points: p.map(q => q.join(",")).join(" "), fill: MAPC[key] }, svg)));
+    drawCourse(svg, geo);
     H.shots.forEach(s => { const c = SHOTC[s[1]], thin = s[1] === "c";
       el("line", { x1: s[2], y1: s[3], x2: s[4], y2: s[5], stroke: c, "stroke-width": (thin ? 1.2 : 2.4) * k, "stroke-opacity": thin ? 0.7 : 1, "stroke-linecap": "round" }, svg);
       if (!thin) { el("circle", { cx: s[4], cy: s[5], r: 4.2 * k, fill: c, stroke: "#111", "stroke-width": 1 * k }, svg).appendChild(el("title", {}, null, `${s[0]} ${s[6]} 碼`)); } });
