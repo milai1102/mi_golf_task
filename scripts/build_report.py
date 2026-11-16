@@ -773,7 +773,9 @@ th{color:var(--ink2);font-weight:500}
 .tabs{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px}.chart .legend svg,.chart .sclg svg{display:inline-block;width:auto;height:auto;flex:none}.panel .legend{margin-top:10px}.panel{padding:6px 0 4px}
 .maps{display:grid;gap:10px;margin-top:8px}.maps figure{margin:0;background:#111110;border-radius:10px;padding:6px 4px 4px;min-width:0}.maps figcaption{font-size:12px;color:#c3c2b7;text-align:center;padding-bottom:2px;white-space:nowrap}
 .maps svg{display:block;width:100%}.maps.strip{width:calc(100vw - 46px);display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;gap:8px;padding-bottom:6px}.maps.strip figure{flex:0 0 calc((100% - (var(--per) - 1) * 8px) / var(--per));scroll-snap-align:start}.sub{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:12px;color:var(--ink2);margin-top:6px}.sub .fchip{font-size:12px;padding:2px 10px}
-nav a.page{font-weight:600;color:var(--surface);background:var(--ink);border-color:var(--ink)}nav a.page:hover{color:var(--surface)}
+.ptabs{display:flex;margin:16px 0 4px;border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:4px;gap:4px}.ptabs a{flex:1;text-align:center;font-size:15px;font-weight:600;color:var(--ink2);text-decoration:none;padding:9px 6px;border-radius:9px;white-space:nowrap}.ptabs a.on{background:var(--ink);color:var(--surface)}
+nav{margin:10px 0 0}nav a{font-size:12px;padding:3px 10px}
+.morelink{display:none}
 .maps.strip.big{width:auto}.maps.strip.big figure{padding:10px 8px 8px}.maps.strip.big figcaption{font-size:15px;font-weight:600;color:#f0efec}
 .cstat{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 14px;font-size:12px;color:#c3c2b7;padding:2px 0 6px}.cstat b{color:#f0efec;font-weight:600}
 .cplays{width:100%;margin-top:6px;font-size:12px;color:#c3c2b7}.cplays td{padding:3px 4px;text-align:center;border-bottom:1px solid #2c2c2a;white-space:nowrap}.cplays td.bad{color:#f06a6a;font-weight:600}.cplays td.good{color:#2fbf4f;font-weight:600}
@@ -792,7 +794,7 @@ section{padding:14px 12px 12px;margin-top:14px;border-radius:10px}section h2{fon
 .legend{gap:6px 14px}th,td{padding:4px 8px}
 }
 </style></head><body><div class="wrap">
-<header><h1 id="h1"></h1><p id="meta"></p></header><nav id="nav"></nav><main id="main"></main><p class="morelink"><a id="link"></a></p></div>
+<header><h1 id="h1"></h1><p id="meta"></p></header><div class="ptabs" id="ptabs"></div><nav id="nav"></nav><main id="main"></main><p class="morelink"><a id="link"></a></p></div>
 <script>
 const REPORT = __DATA__;
 const NS = "http://www.w3.org/2000/svg";
@@ -1215,11 +1217,12 @@ DRAW.roundlist = (sec, host) => {
 
 document.getElementById("meta").textContent = REPORT.meta;
 document.getElementById("h1").textContent = REPORT.title; document.title = REPORT.title;
+(REPORT.tabs || []).forEach(([href, label]) => { const a = h("a", href === REPORT.page ? "on" : "", document.getElementById("ptabs"), label); a.href = href; });
 { const a = document.getElementById("link"); a.textContent = REPORT.link[1]; a.href = REPORT.link[0]; }
 const main = document.getElementById("main"), nav = document.getElementById("nav");
 function render() {
   main.replaceChildren(); nav.replaceChildren();
-  const pages = () => (REPORT.top || []).forEach(([href, label]) => { const a = h("a", "page", nav, label); a.href = href; });
+  nav.style.display = REPORT.sections.length > 1 ? "" : "none";
   for (const sec of REPORT.sections) {
     if (REPORT.sections.length > 1) { const a = h("a", "", nav, sec.short || sec.title); a.href = "#" + sec.id; }
     const s = h("section", "", main); s.id = sec.id;
@@ -1232,7 +1235,6 @@ function render() {
     sec.table.head.forEach(label => h("th", "", hr, label));
     sec.table.rows.forEach(r => { const tr = h("tr", "", t); r.forEach(v => h("td", "", tr, v)); });
   }
-  pages();
 }
 render();
 let rt, lastW = innerWidth;   // 手機捲動時網址列收合也會觸發 resize，只有寬度真的變了才重畫
@@ -1252,14 +1254,14 @@ def main():
     shots = con.execute("SELECT COUNT(*) FROM shots").fetchone()[0]
     meta = f"{n} 場（{first} 至 {last}）・{shots} 桿擊球紀錄・產生時間 {datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))):%Y-%m-%d %H:%M}"
     pages = [("index.html", "MI 高爾夫數據", MAIN, ["more.html", "更多分析（其餘 %d 張圖）→" % len(MORE)]),
-             ("more.html", "MI 高爾夫數據：更多分析", MORE, ["index.html", "← 回主頁"]),
-             ("courses.html", "MI 高爾夫數據：打過的球場", [section_courses], ["index.html", "← 回主頁"])]
-    top = {"index.html": [["courses.html", "打過的球場"], ["more.html", "更多分析"]], "more.html": [["index.html", "主頁"], ["courses.html", "打過的球場"]], "courses.html": [["index.html", "主頁"], ["more.html", "更多分析"]]}
+             ("more.html", "MI 高爾夫數據", MORE, ["index.html", "← 回主頁"]),
+             ("courses.html", "MI 高爾夫數據", [section_courses], ["index.html", "← 回主頁"])]
+    tabs = [["index.html", "主畫面"], ["courses.html", "打過的球場"], ["more.html", "更多分析"]]
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     for fname, title, sections, link in pages:
         secs = [f(con) for f in sections]
         for x in secs: x["short"] = NAV_SHORT.get(x["id"], x["title"])          # 導覽列只放簡稱，不放說明
-        report = {"meta": meta, "title": title, "link": link, "success": SUCCESS, "sections": secs, "top": top[fname], "geo": GEO if any(x["kind"] in ("roundlist", "courses") for x in secs) else {}}
+        report = {"meta": meta, "title": title, "link": link, "success": SUCCESS, "sections": secs, "tabs": tabs, "page": fname, "geo": GEO if any(x["kind"] in ("roundlist", "courses") for x in secs) else {}}
         path = os.path.join(os.path.dirname(OUT), fname)
         open(path, "w", encoding="utf-8").write(PAGE.replace("__DATA__", json.dumps(report, ensure_ascii=False)))
         print("已產生", path, "|", len(sections), "個區塊")
