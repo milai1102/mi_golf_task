@@ -594,11 +594,11 @@ PLAN_START = "2026-11-16"          # 計劃定案的日期，這一天之後的�
 PLAN_GOAL = {"score": 95, "by": "2026 年底前", "next": "明年第一季 90"}
 PLAN_BLOW = 1                      # 每場爆桿幾洞以下（推桿的門檻用 TARGET_ROUND_PUTTS）
 PLAN_BAG = ["鐵木桿", "6鐵", "8鐵", "P杆"]
-PLAN_TRAIN = [["長推的距離感", "下場前在練習果嶺推 20 分鐘，只推 8 到 15 步。在家的 4 步照舊，每球換距離。"],
-              ["鐵木桿", "練習場模擬球洞的練法照舊，重心放在這一支。"],
-              ["80 碼內一次上果嶺、盡量靠近", "每隔一天的切球練習照舊，多練 50 到 80 碼。"],
-              ["一號木：穩定的右曲，不要 150 碼以下", "瞄左、固定的右曲照舊，不改球路。練習場每 10 球數幾球落在目標範圍。距離先不追。"]]
-PLAN_RULE = ["選桿用常態距離，不用最好的距離", "上場的揮桿幅度比練習場小，距離固定短 10 到 20 碼。打得好飛過頭的機率低，可以接受。"]
+PLAN_TRAIN = [["長推", "三推 7 洞以下", "下場前在練習果嶺推 8 到 15 步"],          # 標題、目標、怎麼練（都要短）
+              ["鐵木桿", "打壞 10% 以下", "練習場模擬球洞，重心放這一支"],
+              ["80 碼內", "一次上果嶺 85%", "隔天練切球，多練 50 到 80 碼"],
+              ["一號木", "150 碼以下每場 1 球", "瞄左、固定右曲，不追距離"]]
+PLAN_RULE = ["選桿用常態距離", "一號木瞄左，身體留在後面", "80 碼內先求上果嶺", "長推先求停在洞邊"]   # 上場要注意的事，一句一件
 PLAN_LATER = ["把 8 鐵、P 杆的距離練長", "三號木"]
 
 def section_plan(con):
@@ -625,9 +625,8 @@ def section_plan(con):
         FROM shots s WHERE s.shot_type!='PUTT' AND s.to_pin_start_m>0 AND s.to_pin_start_m*1.09361<=80 AND s.round_id IN ({q})
         AND NOT EXISTS(SELECT 1 FROM shots p WHERE p.round_id=s.round_id AND p.seq=s.seq AND p.shot_no<s.shot_no AND p.shot_type!='PUTT' AND p.to_pin_start_m>0 AND p.to_pin_start_m*1.09361<=80)""", ids).fetchall()
     on = lambda rs: sum(1 for d, lie, end, later in rs if later == 0 and (lie == "Green" or end == 0)); far = [r for r in ch if r[0] > 50]
-    fl = [f"每場三推 {facts['three']} 洞", f"每場打 {facts['hy_n']} 次，{facts['hy_bad']}% 打壞",
-          f"每場 {round(len(ch) / max(1, len(ids)), 1)} 次，{pct(on(ch), len(ch))}% 一次上（50 到 80 碼 {pct(on(far), len(far))}%）",
-          f"常態 {dd[(len(dd) - 1) // 2] if dd else '—'} 碼，180 以上 {pct(sum(x >= 180 for x in dd), len(dd))}%，偏右 {pct(sum(f == 'RIGHT' for _, f in dr), len(dr))}%，150 以下 {pct(sum(x < 150 for x in dd), len(dd))}%"]
+    fl = [f"三推 {facts['three']} 洞", f"打壞 {facts['hy_bad']}%（每場 {facts['hy_n']} 次）", f"一次上果嶺 {pct(on(ch), len(ch))}%（每場 {round(len(ch) / max(1, len(ids)), 1)} 次）",
+          f"150 碼以下每場 {round(sum(x < 150 for x in dd) / max(1, len(ids)), 1)} 球"]
     data = {"factlist": fl, "goal": PLAN_GOAL, "check": {"putts": TARGET_ROUND_PUTTS, "blow": PLAN_BLOW}, "start": PLAN_START, "base": {"n": len(base), "strokes": avg("strokes", base), "best": min(r["strokes"] for r in base), "putts": avg("putts", base), "blow": avg("blow", base)},
             "after": after, "recent": base[:5], "train": PLAN_TRAIN, "rule": PLAN_RULE, "later": PLAN_LATER, "bag": bag, "facts": facts, "total": len(rows)}
     note = (f"目標與計劃在 {PLAN_START} 定案，文字寫在 build_report.py 的 PLAN_* 常數。現況是定案前最近 {len(base)} 場完整 18 洞的平均。"
@@ -850,7 +849,7 @@ nav{margin:10px 0 0}nav a{font-size:12px;padding:3px 10px}
 .ptab{width:100%;margin-top:12px;font-size:14px;font-variant-numeric:tabular-nums}.ptab th{font-size:12px;color:var(--muted);font-weight:500}.ptab th,.ptab td{text-align:center;padding:7px 4px;border-bottom:1px solid var(--grid)}.ptab td.ok{color:var(--up);font-weight:700}.ptab td.no{color:var(--ink2)}.ptab td.strong{font-weight:700;font-size:16px}
 .plan .cap{font-size:12px;color:var(--muted);margin-top:6px;text-align:center}
 .pcard{display:flex;gap:12px;border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:10px;background:var(--page)}.pcard .num{flex:none;width:28px;height:28px;border-radius:50%;background:var(--ink);color:var(--surface);display:flex;align-items:center;justify-content:center;font-size:15px}
-.pcard .t{font-size:17px;font-weight:700}.pcard .f{font-size:13px;color:var(--trend);margin:2px 0 4px}.pcard .b{font-size:14px;color:var(--ink2);line-height:1.6}.pcard.rule{border-color:var(--series)}
+.pcard .t{font-size:17px;font-weight:700}.pcard .f{font-size:13px;color:var(--trend);margin:2px 0 4px}.pcard .b{font-size:14px;color:var(--ink2);line-height:1.6}.pcard.rule{border-color:var(--series)}.pcard .tg{color:var(--up)}.pcard .f{color:var(--muted)}.pcard ol{margin:0;padding-left:22px;font-size:17px;font-weight:600;line-height:2}
 .plater{font-size:14px;color:var(--muted);line-height:1.8}
 @media (max-width:640px){.ptabs a{font-size:13px;padding:9px 2px}}
 .cmap{height:360px;border-radius:12px;margin:4px 0 12px;overflow:hidden;background:var(--page);z-index:0}
@@ -1325,10 +1324,10 @@ DRAW.plan = (sec, host) => {
   rows.forEach(r => { const tr = h("tr", "", tb); h("td", "", tr, r.date.slice(2).replaceAll("-", "/")); h("td", "", tr, r.short);
     mk(h("td", "", tr), r.strokes, r.strokes <= d.goal.score); mk(h("td", "", tr), r.putts, r.putts <= d.check.putts); mk(h("td", "", tr), r.blow, r.blow <= d.check.blow); });
   h("div", "cap", box, d.after.length ? "計劃開始後的 " + d.after.length + " 場，綠色是達標" : "計劃開始前最近 " + rows.length + " 場，綠色是達標。下一場起列在這裡");
-  h("h3", "", box, "練習項目（依重要性排序）"); const facts = d.factlist;
-  d.train.forEach(([t, body], i) => { const c = h("div", "pcard", box); h("b", "num", c, String(i + 1)); const w = h("div", "", c); h("div", "t", w, t); h("div", "f", w, facts[i]); h("div", "b", w, body); });
-  h("h3", "", box, "上場只守一條");
-  const c = h("div", "pcard rule", box), w = h("div", "", c); h("div", "t", w, d.rule[0]); h("div", "b", w, d.rule[1]);
+  h("h3", "", box, "四個練習目標");
+  d.train.forEach(([t, goal, how], i) => { const c = h("div", "pcard", box); h("b", "num", c, String(i + 1)); const w = h("div", "", c); const r = h("div", "t", w, t + "　"); h("span", "tg", r, goal); h("div", "f", w, "現在 " + d.factlist[i]); h("div", "b", w, how); });
+  h("h3", "", box, "上場只想這幾件事");
+  const c = h("div", "pcard rule", box), ol = h("ol", "", c); d.rule.forEach(x => h("li", "", ol, x));
   const bt = h("table", "ptab", box), bh = h("tr", "", bt); ["球桿", "選桿用（常態）", "打得好", "球數"].forEach(x => h("th", "", bh, x));
   d.bag.forEach(b => { const tr = h("tr", "", bt), few = b.n < 30; h("td", "", tr, b.club); h("td", few ? "" : "strong", tr, few ? "累積中" : b.med); h("td", "", tr, few ? "—" : b.good); h("td", "", tr, b.n); });
   h("div", "cap", box, "碼。不到 30 球的球桿先不下結論");
