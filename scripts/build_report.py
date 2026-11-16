@@ -585,7 +585,7 @@ def section_courses(con):
         lays = [{"cid": L["cid"], "label": L["label"], "holes": [L["holes"][k] for k in sorted(L["holes"])]} for L in c["layouts"].values()]
         ll = [round(sum(p[0] for p in c["pins"]) / len(c["pins"]), 4), round(sum(p[1] for p in c["pins"]) / len(c["pins"]), 4)] if c["pins"] else None
         tw = bool(ll) and 21.5 < ll[0] < 25.6 and 119 < ll[1] < 122.5
-        out.append({"short": c["short"], "name": c["name"], "n": len(c["rounds"]), "last": c["last"], "layouts": lays, "ll": ll, "region": ("北部" if ll[0] > 24.5 else "中部" if ll[0] > 23.6 else "南部") if tw else "國外" if ll else "其他"})
+        out.append({"short": c["short"], "name": c["name"], "n": len(c["rounds"]), "last": c["last"], "layouts": lays, "ll": ll, "region": ("北台灣" if ll[0] > 24.5 else "中台灣" if ll[0] > 23.6 else "南台灣") if tw else ("越南" if 8 < ll[0] < 23.5 and 102 < ll[1] < 110 else "國外") if ll else "其他"})
     note = "每一洞把歷次的擊球路線疊在同一張圖上，最近一次最清楚，越早的越淡。紅＝一號木、橘＝鐵木桿、藍＝鐵桿、細白線＝切球桿。球場輪廓是依 Garmin 地圖重新描的示意圖。"
     return {"id": "courses", "title": "打過的球場", "note": note, "kind": "courses", "data": out, "table": {"head": [], "rows": []}}
 
@@ -1093,7 +1093,7 @@ DRAW.putts = (sec, host) => {
 DRAW.courses = (sec, host) => {
   const MAPC = { outline: "#2f5d2a", tree: "#1c3a1e", fairway: "#58963f", water: "#3c6edc", sand: "#e1cdaa", green: "#8ccd6e" }, SHOTC = { d: "#ff5a5a", w: "#ffa51f", i: "#5aa9ff", c: "#ffffff" };
   let ci = 0, li = 0, region = sec.data[0].region, map = null, marks = [];
-  const regions = ["北部", "中部", "南部", "國外", "其他"].filter(g => sec.data.some(c => c.region === g)), s0 = h("div", "filters", host), mapEl = h("div", "cmap", host); mapEl.style.display = "none";
+  const regions = ["北台灣", "中台灣", "南台灣", "越南", "國外", "其他"].filter(g => sec.data.some(c => c.region === g)), s0 = h("div", "filters", host), mapEl = h("div", "cmap", host); mapEl.style.display = "none";
   const fit = () => { if (!map) return; const pts = sec.data.filter(c => c.region === region && c.ll).map(c => c.ll); if (pts.length) map.fitBounds(pts, { padding: [48, 48], maxZoom: 11 }); };
   const paint = () => marks.forEach(([i, m]) => { const on = i === ci; m.setStyle({ radius: on ? 11 : 8, fillColor: on ? "#ff5a5a" : "#3987e5", weight: on ? 3 : 2 }); if (on) m.bringToFront(); });
   const initMap = () => { mapEl.style.display = ""; map = L.map(mapEl, { zoomControl: true, attributionControl: true, scrollWheelZoom: false, preferCanvas: true, zoomSnap: 0.25 }); map.attributionControl.setPrefix(false);
