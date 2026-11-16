@@ -599,7 +599,7 @@ PLAN_TRAIN = [["長推", "三推 7 洞以下", "下場前在練習果嶺推 8 �
               ["80 碼內", "一次上果嶺 85%", "隔天練切球，多練 50 到 80 碼"],
               ["一號木", "150 碼以下每場 1 球", "瞄左、固定右曲，不追距離"]]
 PLAN_RULE = ["選桿用常態距離", "一號木瞄左，身體留在後面", "80 碼內先求上果嶺", "長推先求停在洞邊"]   # 上場要注意的事，一句一件
-PLAN_LATER = ["把 8 鐵、P 杆的距離練長", "三號木"]
+PLAN_LATER = ["7 鐵、9 鐵拿出來練", "8 鐵、P 杆的距離練長", "一號木 180 碼", "三號木"]   # 長期計劃：短期目標達成後才做
 
 def section_plan(con):
     rounds = con.execute("SELECT round_id, date, course_short, strokes FROM rounds WHERE category='full_18' ORDER BY date DESC").fetchall()
@@ -850,7 +850,7 @@ nav{margin:10px 0 0}nav a{font-size:12px;padding:3px 10px}
 .plan .cap{font-size:12px;color:var(--muted);margin-top:6px;text-align:center}
 .pcard{display:flex;gap:12px;border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:10px;background:var(--page)}.pcard .num{flex:none;width:28px;height:28px;border-radius:50%;background:var(--ink);color:var(--surface);display:flex;align-items:center;justify-content:center;font-size:15px}
 .pcard .t{font-size:17px;font-weight:700}.pcard .f{font-size:13px;color:var(--trend);margin:2px 0 4px}.pcard .b{font-size:14px;color:var(--ink2);line-height:1.6}.pcard.rule{border-color:var(--series)}.pcard .tg{color:var(--up)}.pcard .f{color:var(--muted)}.pcard ol{margin:0;padding-left:22px;font-size:17px;font-weight:600;line-height:2}
-.plater{font-size:14px;color:var(--muted);line-height:1.8}
+.plater{font-size:15px;color:var(--ink2);line-height:1.9;margin:0;padding-left:22px}.plan .lead+h3{margin-top:8px}
 @media (max-width:640px){.ptabs a{font-size:13px;padding:9px 2px}}
 .cmap{height:360px;border-radius:12px;margin:4px 0 12px;overflow:hidden;background:var(--page);z-index:0}
 .leaflet-tooltip.ctip{background:rgba(17,17,16,.9);color:#f0efec;border:0;border-radius:6px;padding:2px 7px;font-size:12px;font-weight:600;box-shadow:none;white-space:nowrap}.leaflet-tooltip.ctip:before{display:none}.cmap .leaflet-interactive{cursor:pointer}.cmap .tdark{filter:invert(1) hue-rotate(180deg) brightness(.9) contrast(.9)}
@@ -1313,7 +1313,7 @@ DRAW.roundlist = (sec, host) => {
 
 DRAW.plan = (sec, host) => {
   const d = sec.data, box = h("div", "plan", host);
-  h("p", "lead", box, "AI 分析完 " + d.total + " 場的數據之後，制定的目標和訓練計劃。");
+  h("p", "lead", box, "AI 分析完 " + d.total + " 場的數據之後，制定的目標和訓練計劃。"); h("h3", "", box, "短期計劃（到 " + d.goal.by.replace("前", "") + "）");
   const g = h("div", "pgoal", box); h("div", "k", g, d.goal.by + "打出一場"); h("div", "big", g, d.goal.score + " 以下"); h("div", "k", g, "最近 " + d.base.n + " 場平均 " + d.base.strokes + "，最好 " + d.base.best + "・" + d.goal.next);
   h("h3", "", box, "每場只看兩個數字");
   const t2 = h("div", "ptiles", box);
@@ -1331,8 +1331,9 @@ DRAW.plan = (sec, host) => {
   const bt = h("table", "ptab", box), bh = h("tr", "", bt); ["離旗桿", "球桿", "常態", "打得好"].forEach(x => h("th", "", bh, x));
   d.bag.forEach(b => { const tr = h("tr", "", bt), few = b.n < 30; h("td", "", tr, b.use); h("td", "strong", tr, b.club); h("td", "", tr, b.chip ? "—" : few ? "累積中" : b.med); h("td", "", tr, b.chip || few ? "—" : b.good); });
   h("div", "cap", box, "碼。常態與打得好是全揮桿的距離");
-  h("h3", "", box, "先放下的");
-  h("div", "plater", box, d.later.join("・"));
+  h("h3", "", box, "長期計劃（" + d.goal.next + "）");
+  const ul = h("ul", "plater", box); d.later.forEach(x => h("li", "", ul, x));
+  h("div", "cap", box, "短期目標達成後才開始");
 };
 
 document.getElementById("meta").textContent = REPORT.meta;
