@@ -1223,7 +1223,7 @@ DRAW.roundlist = (sec, host) => {
   const detail = r => { const box = document.createElement("div"); h("div", "scname", box, r.course); box.appendChild(card(r));
     const tabs = h("div", "tabs", box), panel = h("div", "panel", box); let open = null;
     const items = [["逐洞擊球明細", p => p.appendChild(shotsTable(r))]];
-    if (r.gps) { items.push(["一號木開球", p => drivePanel(r, p)]); items.push(["球道圖", p => mapPanel(r, p)]); }
+    if (r.gps) { items.push(["一號木開球", p => drivePanel(r, p)]); items.push(["球道揮桿圖", p => mapPanel(r, p)]); }
     items.forEach(([label, fill]) => { const b = h("button", "fchip", tabs, label);
       b.addEventListener("click", () => { const was = open === label; open = was ? null : label; panel.replaceChildren(); [...tabs.children].forEach(c => c.classList.toggle("on", !was && c === b)); if (!was) fill(panel); }); });
     return box; };
