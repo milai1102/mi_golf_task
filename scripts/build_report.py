@@ -565,8 +565,16 @@ def section_courses(con):
             p = os.path.join(ROOT, "data/raw/gps", f"{sid}.txt")
             if os.path.exists(p): cid_layout[open(p, encoding="utf-8").readline().split("|")[1]] = "／".join(layout_labels(lay))
         per = round_parts(fname)[0]
-        c = courses.setdefault(short, {"name": course, "short": short, "layouts": {}, "last": date, "rounds": set()})
-        c["last"] = date; c["rounds"].add(rid)
+        pins = []
+        for sid in layout:
+            gp = os.path.join(ROOT, "data/raw/gps", f"{sid}.txt")
+            if os.path.exists(gp):
+                for line in open(gp, encoding="utf-8"):
+                    if line.startswith("H"):
+                        q = line.split("|")[2].split(",")
+                        if q[0]: pins.append((int(q[0]) * 180 / 2 ** 31, int(q[1]) * 180 / 2 ** 31))      # Garmin 的 semicircle → 度
+        c = courses.setdefault(short, {"name": course, "pins": [], "short": short, "layouts": {}, "last": date, "rounds": set()})
+        c["last"] = date; c["rounds"].add(rid); c["pins"] += pins
         for H in g["holes"]:
             par, st, putts = hrow.get(H["n"], (H["par"], None, None))
             L = c["layouts"].setdefault(H["cid"], {"cid": H["cid"], "label": (per[H["n"] - 1] if per and H["n"] <= len(per) else "") or cid_layout.get(H["cid"], ""), "holes": {}})
@@ -575,7 +583,9 @@ def section_courses(con):
     out = []
     for c in sorted(courses.values(), key=lambda c: c["last"], reverse=True):
         lays = [{"cid": L["cid"], "label": L["label"], "holes": [L["holes"][k] for k in sorted(L["holes"])]} for L in c["layouts"].values()]
-        out.append({"short": c["short"], "name": c["name"], "n": len(c["rounds"]), "last": c["last"], "layouts": lays})
+        ll = [round(sum(p[0] for p in c["pins"]) / len(c["pins"]), 4), round(sum(p[1] for p in c["pins"]) / len(c["pins"]), 4)] if c["pins"] else None
+        tw = bool(ll) and 21.5 < ll[0] < 25.6 and 119 < ll[1] < 122.5
+        out.append({"short": c["short"], "name": c["name"], "n": len(c["rounds"]), "last": c["last"], "layouts": lays, "ll": ll, "region": ("北部" if ll[0] > 24.5 else "中部" if ll[0] > 23.6 else "南部") if tw else "國外" if ll else "其他"})
     note = "每一洞把歷次的擊球路線疊在同一張圖上，最近一次最清楚，越早的越淡。紅＝一號木、橘＝鐵木桿、藍＝鐵桿、細白線＝切球桿。球場輪廓是依 Garmin 地圖重新描的示意圖。"
     return {"id": "courses", "title": "打過的球場", "note": note, "kind": "courses", "data": out, "table": {"head": [], "rows": []}}
 
@@ -787,6 +797,8 @@ nav{margin:10px 0 0}nav a{font-size:12px;padding:3px 10px}
 .cstat{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 14px;font-size:12px;color:#c3c2b7;padding:2px 0 6px}.cstat b{color:#f0efec;font-weight:600}
 .cplays{width:100%;margin-top:6px;font-size:12px;color:#c3c2b7}.cplays td{padding:3px 4px;text-align:center;border-bottom:1px solid #2c2c2a;white-space:nowrap}.cplays td.bad{color:#f06a6a;font-weight:600}.cplays td.good{color:#2fbf4f;font-weight:600}
 .sub.holes .fchip{min-width:34px;padding:2px 6px}
+.cmap{height:360px;border-radius:12px;margin:4px 0 12px;overflow:hidden;background:var(--page);z-index:0}
+.leaflet-tooltip.ctip{background:rgba(17,17,16,.9);color:#f0efec;border:0;border-radius:6px;padding:2px 7px;font-size:12px;font-weight:600;box-shadow:none;white-space:nowrap}.leaflet-tooltip.ctip:before{display:none}.cmap .leaflet-interactive{cursor:pointer}
 .hint{display:none;font-size:12px;color:var(--muted);margin:0 0 4px}
 .chart.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}.chart.scroll svg{width:var(--w);max-width:none}
 details{overflow-x:auto}
@@ -795,6 +807,7 @@ details{overflow-x:auto}
 nav{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px}nav a{flex:none;white-space:nowrap}
 section{padding:14px 12px 12px;margin-top:14px;border-radius:10px}section h2{font-size:16px}
 .hint{display:block}
+.cmap{height:300px}
 .filters,.sub.holes{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px}.filters .fchip,.sub.holes .fchip{flex:none}
 .rl{font-size:14px}.rl th,.rl td{padding:9px 4px;white-space:nowrap}.rl td.course{white-space:normal;line-height:1.35}.rl td.arrow,.rl>tr>th:last-child{display:none}
 .rl tr.detail>td{padding:4px 0 12px 0;white-space:normal}.sc{padding:4px 2px 0}.m{width:23px;height:23px;font-size:14px;border-width:1.5px}.m.dbl,.m.blow,.m.eagle{outline-width:1.5px;outline-offset:1.5px}.scg .hn,.scg .pr{font-size:12px}.dots{font-size:11px;letter-spacing:0}.rt{font-size:12px}.rt td,.rt th{padding:5px 3px}.rt td.shots{white-space:normal}.chip{padding:0 5px;margin:1px 3px 1px 0;font-size:11px}
@@ -1079,7 +1092,18 @@ DRAW.putts = (sec, host) => {
 // 球場紀錄：選球場 → 一洞一張大圖，左右滑動；每一洞疊上歷次的路線
 DRAW.courses = (sec, host) => {
   const MAPC = { outline: "#2f5d2a", tree: "#1c3a1e", fairway: "#58963f", water: "#3c6edc", sand: "#e1cdaa", green: "#8ccd6e" }, SHOTC = { d: "#ff5a5a", w: "#ffa51f", i: "#5aa9ff", c: "#ffffff" };
-  let ci = 0, li = 0; const s1 = h("div", "filters", host), s2 = h("div", "sub", host), s3 = h("div", "sub holes", host), strip = h("div", "maps strip big", host), lg = h("div", "legend", host);
+  let ci = 0, li = 0, region = sec.data[0].region, map = null, marks = [];
+  const regions = ["北部", "中部", "南部", "國外", "其他"].filter(g => sec.data.some(c => c.region === g)), s0 = h("div", "filters", host), mapEl = h("div", "cmap", host); mapEl.style.display = "none";
+  const fit = () => { if (!map) return; const pts = sec.data.filter(c => c.region === region && c.ll).map(c => c.ll); if (pts.length) map.fitBounds(pts, { padding: [48, 48], maxZoom: 11 }); };
+  const paint = () => marks.forEach(([i, m]) => { const on = i === ci; m.setStyle({ radius: on ? 11 : 8, fillColor: on ? "#ff5a5a" : "#3987e5", weight: on ? 3 : 2 }); if (on) m.bringToFront(); });
+  const initMap = () => { mapEl.style.display = ""; map = L.map(mapEl, { zoomControl: true, attributionControl: true, scrollWheelZoom: false, preferCanvas: true, zoomSnap: 0.25 }); map.attributionControl.setPrefix(false);
+    L.tileLayer(`https://{s}.basemaps.cartocdn.com/${DARK ? "dark_all" : "light_all"}/{z}/{x}/{y}{r}.png`, { subdomains: "abcd", maxZoom: 18, attribution: "© OpenStreetMap contributors © CARTO" }).addTo(map);
+    sec.data.forEach((c, i) => { if (!c.ll) return; const m = L.circleMarker(c.ll, { color: "#fff", fillOpacity: 1 }).addTo(map);
+      m.bindTooltip(`${c.short} ${c.n}`, { permanent: true, direction: "top", offset: [0, -8], className: "ctip", interactive: true }); m.on("click", () => { ci = i; li = 0; region = c.region; draw(); host.querySelector(".sub.holes").scrollIntoView({ behavior: "smooth", block: "start" }); }); marks.push([i, m]); });
+    fit(); paint(); };
+  { const css = document.createElement("link"); css.rel = "stylesheet"; css.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"; document.head.appendChild(css);
+    const js = document.createElement("script"); js.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"; js.onload = () => { try { initMap(); } catch (e) { mapEl.style.display = "none"; } }; document.head.appendChild(js); }
+  const s1 = h("div", "filters", host), s2 = h("div", "sub", host), s3 = h("div", "sub holes", host), strip = h("div", "maps strip big", host), lg = h("div", "legend", host);
   lg.innerHTML = [["d", "一號木"], ["w", "鐵木桿"], ["i", "鐵桿"]].map(([c, t]) => `<span><svg width="20" height="14"><line x1="1" y1="7" x2="13" y2="7" stroke="${SHOTC[c]}" stroke-width="2.4"/><circle cx="15" cy="7" r="3.6" fill="${SHOTC[c]}"/></svg>${t}</span>`).join("") +
     `<span><svg width="20" height="14"><line x1="1" y1="7" x2="19" y2="7" stroke="var(--ink2)" stroke-width="1.2"/></svg>切球桿</span><span>越淡＝越早的場次</span>`;
   const fig = (L, H) => { const f = document.createElement("figure"), geo = (REPORT.geo[L.cid] || {})[H.h] || {}, P = H.plays, sts = P.map(p => p.st).filter(v => v != null);
@@ -1099,8 +1123,11 @@ DRAW.courses = (sec, host) => {
       h("td", "", tr, p.date.slice(2).replace(/-/g, "/")); h("td", dv == null ? "" : dv >= 3 ? "bad" : dv <= 0 ? "good" : "", tr, p.st == null ? "" : p.st + " 桿"); h("td", p.putts >= 3 ? "bad" : "", tr, p.putts == null ? "" : p.putts + " 推");
       h("td", "", tr, d0 ? `${d0[0].replace("桿", "").replace("杆", "")} ${d0[6]} 碼` : ""); h("td", d0 && d0[7] === "Fairway" ? "good" : "", tr, d0 ? ({ Fairway: "球道", Rough: "長草", Bunker: "沙坑", Green: "果嶺", Waste: "荒地" }[d0[7]] || "") : ""); });
     return f; };
-  const draw = () => { s1.replaceChildren(); s2.replaceChildren(); s3.replaceChildren(); strip.replaceChildren(); const C = sec.data[ci], L = C.layouts[li] || C.layouts[0];
-    sec.data.forEach((c, i) => { const b = h("button", "fchip" + (i === ci ? " on" : ""), s1, `${c.short} ${c.n}`); b.addEventListener("click", () => { ci = i; li = 0; draw(); }); });
+  const draw = () => { s0.replaceChildren(); s1.replaceChildren(); s2.replaceChildren(); s3.replaceChildren(); strip.replaceChildren();
+    if (regions.length > 1) regions.forEach(g => { const b = h("button", "fchip" + (g === region ? " on" : ""), s0, `${g} ${sec.data.filter(c => c.region === g).length}`);
+      b.addEventListener("click", () => { region = g; if (sec.data[ci].region !== g) { ci = sec.data.findIndex(c => c.region === g); li = 0; } draw(); fit(); }); });
+    paint(); const C = sec.data[ci], L = C.layouts[li] || C.layouts[0];
+    sec.data.forEach((c, i) => { if (c.region !== region) return; const b = h("button", "fchip" + (i === ci ? " on" : ""), s1, `${c.short} ${c.n}`); b.addEventListener("click", () => { ci = i; li = 0; draw(); }); });
     if (C.layouts.length > 1) C.layouts.forEach((l, i) => { const b = h("button", "fchip" + (i === li ? " on" : ""), s2, l.label || `區 ${i + 1}`); b.addEventListener("click", () => { li = i; draw(); }); });
     strip.style.setProperty("--per", NARROW() ? 1 : Math.min(3, L.holes.length));
     L.holes.forEach((H, i) => { const f = fig(L, H); strip.appendChild(f); const b = h("button", "fchip", s3, H.h); b.addEventListener("click", () => strip.scrollTo({ left: f.offsetLeft - strip.offsetLeft, behavior: "smooth" })); });
