@@ -1023,7 +1023,21 @@ DRAW.roundlist = (sec, host) => {
     const inF = d.filter(p => p.fw).length, R = d.filter(p => !p.fw && p.off > 0).length, L = d.filter(p => !p.fw && p.off <= 0).length, avg = d.reduce((a, p) => a + p.off, 0) / n;
     const lg = h("div", "legend", host), dot = (c, t) => `<span><svg width="14" height="14"><circle cx="7" cy="7" r="5" fill="${c}"/></svg>${t}</span>`;
     lg.innerHTML = `<span><svg width="20" height="14"><rect x="1" y="3" width="18" height="8" rx="2" fill="#4f9a48" fill-opacity=".55"/></svg>落點處的球道寬度</span>` + dot("var(--series)", `在球道 ${inF}`) + dot("var(--down)", `不在球道：偏右 ${R}、偏左 ${L}`) +
-      `<span>${n} 球平均：中線${avg >= 0 ? "右" : "左"} ${Math.abs(avg).toFixed(0)} 碼</span>`; };
+      `<span>${n} 球平均：中線${avg >= 0 ? "右" : "左"} ${Math.abs(avg).toFixed(0)} 碼</span>`;
+    // 散布圖：橫軸是偏離中線幾碼，縱軸是開球距離；每個點是一洞，旁邊標洞號
+    const H2 = nar ? 340 : 400, m2 = { l: 52, r: 16, t: 22, b: 34 }, aw = d.reduce((a, p) => a + p.width, 0) / n;
+    const ylo = Math.floor((Math.min(...d.map(p => p.yd)) - 8) / 20) * 20, yhi = Math.ceil((Math.max(...d.map(p => p.yd)) + 8) / 20) * 20;
+    const X = v => m2.l + (W - m2.l - m2.r) * (v + lim) / (2 * lim), Y = v => m2.t + (H2 - m2.t - m2.b) * (1 - (v - ylo) / (yhi - ylo));
+    const s2 = el("svg", { viewBox: `0 0 ${W} ${H2}`, role: "img", "aria-label": "一號木開球散布圖", style: "margin-top:18px" }, host);
+    el("rect", { x: X(-aw / 2), y: m2.t, width: X(aw / 2) - X(-aw / 2), height: H2 - m2.t - m2.b, fill: "#4f9a48", "fill-opacity": 0.22 }, s2);
+    for (let v = ylo; v <= yhi; v += 20) { el("line", { x1: m2.l, x2: W - m2.r, y1: Y(v), y2: Y(v), stroke: v === ylo ? "var(--axis)" : "var(--grid)" }, s2); el("text", { x: m2.l - 8, y: Y(v) + 4, "text-anchor": "end", class: "tick" }, s2, v); }
+    for (let v = -Math.floor(lim / 10) * 10; v <= lim; v += 10) if (!nar || v % 20 === 0) el("text", { x: X(v), y: H2 - m2.b + 18, "text-anchor": "middle", class: "tick" }, s2, v === 0 ? "中線" : (v < 0 ? "左 " : "右 ") + Math.abs(v));
+    el("line", { x1: X(0), x2: X(0), y1: m2.t, y2: H2 - m2.b, stroke: "var(--ink)", "stroke-dasharray": "4 4", "stroke-opacity": 0.6 }, s2);
+    el("text", { x: m2.l - 8, y: m2.t - 8, "text-anchor": "end", class: "tick" }, s2, "碼");
+    d.forEach(p => { el("circle", { cx: X(p.off), cy: Y(p.yd), r: 7, fill: p.fw ? "var(--series)" : "var(--down)", stroke: "var(--surface)", "stroke-width": 2 }, s2);
+      el("text", { x: X(p.off) + 11, y: Y(p.yd) + 4, class: "xn" }, s2, p.hole); });
+    const lg2 = h("div", "legend", host);
+    lg2.innerHTML = `<span><svg width="20" height="14"><rect x="1" y="1" width="18" height="12" fill="#4f9a48" fill-opacity=".3"/></svg>球道平均寬度 ${aw.toFixed(0)} 碼</span><span>數字＝洞號</span><span>縱軸＝開球距離</span>`; };
   // ----- 球道圖：一次看幾洞，用 Garmin 地圖描出來的輪廓加上每一桿的路線 -----
   const MAPC = { outline: "#2f5d2a", tree: "#1c3a1e", fairway: "#58963f", water: "#3c6edc", sand: "#e1cdaa", green: "#8ccd6e" }, SHOTC = { d: "#ff5a5a", w: "#ffa51f", i: "#5aa9ff", c: "#ffffff" };
   const holeMap = (r, H, hpx, brief) => { const geo = (REPORT.geo[r.gps.course] || {})[H.n] || {}, fig = document.createElement("figure"), st = (r.holes.find(x => x[0] === H.n) || [])[6];
