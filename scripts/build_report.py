@@ -482,13 +482,14 @@ def fairway_offset(s, e, meters, fairways):
     return round((hi - lo) * ypp), round((lo + hi) / 2 * ypp)
 
 def round_gps(fname):
-    """讀一場的擊球座標；沒有就回傳 None。"""
-    ids = list(dict.fromkeys(r["garmin_scorecard_id"] for r in csv.DictReader(open(os.path.join(ROOT, "data/rounds", fname), encoding="utf-8-sig"))))
-    roles = club_roles(); holes = []; drive = []; cid = None
-    for sid in ids:
+    """讀一場的擊球座標；沒有就回傳 None。前九後九是兩張計分卡、兩個球場代碼，洞號會重複，所以每一洞都帶自己的球場代碼和這一場的第幾洞。"""
+    rows = list(csv.DictReader(open(os.path.join(ROOT, "data/rounds", fname), encoding="utf-8-sig")))
+    seq_of = {(r["garmin_scorecard_id"], int(r["hole"])): int(r["seq"]) for r in rows}
+    roles = club_roles(); holes = []; drive = []
+    for sid in dict.fromkeys(r["garmin_scorecard_id"] for r in rows):
         p = os.path.join(ROOT, "data/raw/gps", f"{sid}.txt")
-        if not os.path.exists(p): return None
-        cur = None
+        if not os.path.exists(p): continue
+        cur = None; cid = None
         for line in open(p, encoding="utf-8"):
             c = line.rstrip("\n").split("|")
             if c[0] == "C":
@@ -497,17 +498,21 @@ def round_gps(fname):
                     gp = os.path.join(ROOT, "data/course_geo", f"{cid}.json")
                     GEO[cid] = json.load(open(gp))["holes"] if os.path.exists(gp) else {}
             elif c[0].startswith("H"):
-                pin = c[2].split(","); cur = {"n": int(c[0][1:]), "par": int(c[1]), "pin": [int(pin[2]), int(pin[3])] if pin[2] else None, "shots": []}; holes.append(cur)
-            elif c[0]:
+                n = int(c[0][1:]); seq = seq_of.get((sid, n)); pin = c[2].split(",")
+                cur = None
+                if seq is None: continue
+                cur = {"n": seq, "h": n, "cid": cid, "par": int(c[1]) if c[1] else None, "pin": [int(pin[2]), int(pin[3])] if len(pin) > 3 and pin[2] else None, "shots": []}; holes.append(cur)
+            elif c[0] and cur is not None:
                 s, e = c[4].split(","), c[5].split(",")
                 if not s[2] or not e[2]: continue
                 club = c[1]; cat = "d" if club == "一號木桿" else "c" if roles.get(club) == "chip" else "w" if "木" in club else "i"
                 sp, ep = (int(s[2]), int(s[3])), (int(e[2]), int(e[3])); yd = round(int(c[3]) * 1.09361)
                 cur["shots"].append([club, cat, sp[0], sp[1], ep[0], ep[1], yd, e[4]])
-                if cat == "d":
-                    fo = fairway_offset(sp, ep, int(c[3]), GEO.get(cid, {}).get(str(cur["n"]), {}).get("fairway", []))
-                    if fo: drive.append({"hole": cur["n"], "yd": yd, "width": fo[0], "off": fo[1], "fw": e[4] == "Fairway"})
-    return {"course": cid, "holes": holes, "drive": drive} if holes else None
+                if cat == "d" and int(c[0]) == 1:                                   # 只算開球那一桿
+                    fo = fairway_offset(sp, ep, int(c[3]), GEO.get(cid, {}).get(str(n), {}).get("fairway", []))
+                    drive.append({"hole": seq, "yd": yd, "width": fo[0] if fo else None, "off": fo[1] if fo else None, "fw": e[4] == "Fairway"})
+    holes.sort(key=lambda h: h["n"]); drive.sort(key=lambda d: d["hole"])
+    return {"holes": holes, "drive": drive} if holes else None
 
 def section_roundlist(con):
     tags = {"short_course": "短球場", "partial": "未打完", "nine": "9 洞"}; out = []
@@ -1009,7 +1014,16 @@ DRAW.roundlist = (sec, host) => {
     h("span", "", lg, "• 推桿數"); { const sp = h("span", "", lg); h("b", "three", sp, "•••"); sp.append("三推以上"); }
     return box; };
   // ----- 一號木開球：落點離球道中線幾碼 -----
-  const drivePanel = (r, host) => { const d = r.gps.drive, n = d.length; if (!n) { h("p", "note", host, "這一場沒有一號木開球的座標。"); return; }
+  const drivePanel = (r, host) => { const all = r.gps.drive, d = all.filter(p => p.off != null), n = d.length; if (!all.length) { h("p", "note", host, "這一場沒有一號木開球的座標。"); return; }
+    if (n < all.length) {      // 這個球場還沒有球道輪廓：只能畫開球距離，顏色是 Garmin 判定在不在球道
+      const W0 = Math.max(host.clientWidth, 320), H0 = 96, m0 = { l: 16, r: 16, t: 26, b: 30 }, lo = Math.floor((Math.min(...all.map(p => p.yd)) - 5) / 20) * 20, hi = Math.ceil((Math.max(...all.map(p => p.yd)) + 5) / 20) * 20;
+      const X0 = v => m0.l + (W0 - m0.l - m0.r) * (v - lo) / (hi - lo), s0 = el("svg", { viewBox: `0 0 ${W0} ${H0}`, role: "img", "aria-label": "一號木開球距離" }, host);
+      el("line", { x1: m0.l, x2: W0 - m0.r, y1: H0 - m0.b, y2: H0 - m0.b, stroke: "var(--axis)" }, s0);
+      for (let v = lo; v <= hi; v += 20) el("text", { x: X0(v), y: H0 - m0.b + 18, "text-anchor": "middle", class: "tick" }, s0, v);
+      all.forEach((p, i) => { el("circle", { cx: X0(p.yd), cy: H0 - m0.b - 12, r: 7, fill: p.fw ? "var(--series)" : "var(--down)", stroke: "var(--surface)", "stroke-width": 2, "fill-opacity": 0.9 }, s0);
+        el("text", { x: X0(p.yd), y: H0 - m0.b - 26 - (i % 2) * 11, "text-anchor": "middle", class: "xn" }, s0, p.hole); });
+      const lg0 = h("div", "legend", host), dot0 = (c, t) => `<span><svg width="14" height="14"><circle cx="7" cy="7" r="5" fill="${c}"/></svg>${t}</span>`, f0 = all.filter(p => p.fw).length;
+      lg0.innerHTML = dot0("var(--series)", `在球道 ${f0}`) + dot0("var(--down)", `不在球道 ${all.length - f0}`) + `<span>橫軸＝開球距離（碼）</span><span>數字＝洞號</span>`; if (!n) return; }
     const W = Math.max(host.clientWidth, 320), nar = W < 560, rh = 30, m = { l: nar ? 64 : 74, r: nar ? 50 : 64, t: 8, b: 30 }, H = m.t + rh * n + m.b;
     const lim = Math.max(40, Math.ceil(Math.max(...d.map(p => Math.max(Math.abs(p.off), p.width / 2))) / 10) * 10 + 5), x = v => m.l + (W - m.l - m.r) * (v + lim) / (2 * lim);
     const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "一號木開球落點" }, host);
@@ -1040,11 +1054,11 @@ DRAW.roundlist = (sec, host) => {
     lg2.innerHTML = `<span><svg width="20" height="14"><rect x="1" y="1" width="18" height="12" fill="#4f9a48" fill-opacity=".3"/></svg>球道平均寬度 ${aw.toFixed(0)} 碼</span><span>數字＝洞號</span><span>縱軸＝開球距離</span>`; };
   // ----- 球道圖：一次看幾洞，用 Garmin 地圖描出來的輪廓加上每一桿的路線 -----
   const MAPC = { outline: "#2f5d2a", tree: "#1c3a1e", fairway: "#58963f", water: "#3c6edc", sand: "#e1cdaa", green: "#8ccd6e" }, SHOTC = { d: "#ff5a5a", w: "#ffa51f", i: "#5aa9ff", c: "#ffffff" };
-  const holeMap = (r, H, hpx, brief) => { const geo = (REPORT.geo[r.gps.course] || {})[H.n] || {}, fig = document.createElement("figure"), st = (r.holes.find(x => x[0] === H.n) || [])[6];
-    h("figcaption", "", fig, brief ? `${H.n}　P${H.par}` + (st ? `　${st}` : "") : `第 ${H.n} 洞　Par ${H.par}` + (st ? `　${st} 桿` : ""));
-    const pts = [].concat(...(geo.outline || []), ...H.shots.map(s => [[s[2], s[3]], [s[4], s[5]]])), xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+  const holeMap = (r, H, hpx, brief) => { const geo = (REPORT.geo[H.cid] || {})[H.h] || {}, fig = document.createElement("figure"), st = (r.holes[H.n - 1] || [])[6];
+    const par = H.par || (r.holes[H.n - 1] || [])[1]; h("figcaption", "", fig, brief ? `${H.n}　P${par}` + (st ? `　${st}` : "") : `第 ${H.n} 洞　Par ${par}` + (st ? `　${st} 桿` : ""));
+    const pts = [].concat(...(geo.outline || []), ...H.shots.map(s => [[s[2], s[3]], [s[4], s[5]]]), H.pin ? [H.pin] : []), xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
     if (!pts.length) return fig;
-    const x0 = Math.min(...xs) - 10, y0 = Math.min(...ys) - 10, w = Math.max(...xs) - x0 + 10, hh = Math.max(...ys) - y0 + 10, k = Math.max(w, hh) / 300;
+    const pad = geo.outline ? 10 : 40, x0 = Math.min(...xs) - pad, y0 = Math.min(...ys) - pad, w = Math.max(...xs) - x0 + pad, hh = Math.max(...ys) - y0 + pad, k = Math.max(w, hh) / 300;
     const svg = el("svg", { viewBox: `${x0} ${y0} ${w} ${hh}`, style: `height:${hpx}px`, preserveAspectRatio: "xMidYMid meet" }, fig);
     ["outline", "tree", "fairway", "water", "sand", "green"].forEach(key => (geo[key] || []).forEach(p => el("polygon", { points: p.map(q => q.join(",")).join(" "), fill: MAPC[key] }, svg)));
     H.shots.forEach(s => { const c = SHOTC[s[1]], thin = s[1] === "c";
