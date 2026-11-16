@@ -709,7 +709,7 @@ th{color:var(--ink2);font-weight:500}
 .sclg{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--ink2);padding:10px 0 2px}.sclg span{display:inline-flex;align-items:center;gap:7px}.sclg .m{width:12px;height:12px;border-width:1.5px;outline-width:1.5px;outline-offset:1.5px}
 .tabs{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px}.chart .legend svg,.chart .sclg svg{display:inline-block;width:auto;height:auto;flex:none}.panel .legend{margin-top:10px}.panel{padding:6px 0 4px}
 .maps{display:grid;gap:10px;margin-top:8px}.maps figure{margin:0;background:#111110;border-radius:10px;padding:6px 4px 4px;min-width:0}.maps figcaption{font-size:12px;color:#c3c2b7;text-align:center;padding-bottom:2px;white-space:nowrap}
-.maps svg{display:block;width:100%}.sub{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:12px;color:var(--ink2);margin-top:6px}.sub .fchip{font-size:12px;padding:2px 10px}
+.maps svg{display:block;width:100%}.maps.strip{width:calc(100vw - 46px);display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;gap:8px;padding-bottom:6px}.maps.strip figure{flex:0 0 calc((100% - (var(--per) - 1) * 8px) / var(--per));scroll-snap-align:start}.sub{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:12px;color:var(--ink2);margin-top:6px}.sub .fchip{font-size:12px;padding:2px 10px}
 .hint{display:none;font-size:12px;color:var(--muted);margin:0 0 4px}
 .chart.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}.chart.scroll svg{width:var(--w);max-width:none}
 details{overflow-x:auto}
@@ -1052,12 +1052,15 @@ DRAW.roundlist = (sec, host) => {
       if (!thin) { el("circle", { cx: s[4], cy: s[5], r: 4.2 * k, fill: c, stroke: "#111", "stroke-width": 1 * k }, svg).appendChild(el("title", {}, null, `${s[0]} ${s[6]} 碼`)); } });
     if (H.pin) { const [px, py] = H.pin; el("line", { x1: px, y1: py, x2: px, y2: py - 16 * k, stroke: "#fff", "stroke-width": 1.5 * k }, svg); el("polygon", { points: `${px},${py - 16 * k} ${px + 9 * k},${py - 12.5 * k} ${px},${py - 9 * k}`, fill: "#ff3b3b" }, svg); }
     return fig; };
-  const mapPanel = (r, host) => { let per = 4, start = 0; const HS = r.gps.holes, sizes = [2, 4, 6, 9, 18].filter(n => n < HS.length || n === 18 && HS.length >= 18 || n === 4);
+  const mapPanel = (r, host) => { const strip = NARROW(); let per = strip ? 2 : 4, start = 0;   // 手機：全部的洞排成一橫列，左右滑動
+    const HS = r.gps.holes, sizes = strip ? [1, 2, 3] : [2, 4, 6, 9, 18].filter(n => n < HS.length || n === 18 && HS.length >= 18 || n === 4);
     const s1 = h("div", "sub", host), s2 = h("div", "sub", host), grid = h("div", "maps", host), lg = h("div", "legend", host);
     lg.innerHTML = [["d", "一號木"], ["w", "鐵木桿"], ["i", "鐵桿"]].map(([c, t]) => `<span><svg width="20" height="14"><line x1="1" y1="7" x2="13" y2="7" stroke="${SHOTC[c]}" stroke-width="2.4"/><circle cx="15" cy="7" r="3.6" fill="${SHOTC[c]}"/></svg>${t}</span>`).join("") +
       `<span><svg width="20" height="14"><line x1="1" y1="7" x2="19" y2="7" stroke="var(--ink2)" stroke-width="1.2"/></svg>切球桿</span>`;
     const draw = () => { s1.replaceChildren(); s2.replaceChildren(); grid.replaceChildren(); h("span", "", s1, "一次看");
       sizes.forEach(n => { const b = h("button", "fchip" + (n === per ? " on" : ""), s1, n >= HS.length ? "全部" : n + " 洞"); b.addEventListener("click", () => { per = n; start = 0; draw(); }); });
+      if (strip) { h("span", "", s2, "↔ 左右滑動看下一洞"); grid.className = "maps strip"; grid.style.setProperty("--per", per);
+        const hpx = per === 1 ? 500 : per === 2 ? 400 : 300; HS.forEach(H => grid.appendChild(holeMap(r, H, hpx, per === 3))); grid.scrollLeft = 0; return; }
       if (per < HS.length) for (let i = 0; i < HS.length; i += per) { const b = h("button", "fchip" + (i === start ? " on" : ""), s2, `${HS[i].n}–${HS[Math.min(i + per, HS.length) - 1].n}`); b.addEventListener("click", () => { start = i; draw(); }); }
       const show = HS.slice(start, start + per), cols = NARROW() ? Math.min(2, show.length) : per <= 6 ? Math.min(per, show.length) : 9;
       grid.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`; const hpx = NARROW() ? 250 : per <= 4 ? 460 : per <= 6 ? 340 : 230;
