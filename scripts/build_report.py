@@ -558,7 +558,7 @@ def section_courses(con):
     for rid, date, course, short, fname in con.execute("SELECT round_id, date, course, course_short, file FROM rounds ORDER BY date"):
         g = round_gps(fname)
         if not g: continue
-        hrow = {seq: (par, st, putts) for seq, par, st, putts in con.execute("SELECT seq, par, strokes, putts FROM holes WHERE round_id=?", (rid,))}
+        hrow = {seq: (par, st, putts, yd) for seq, par, st, putts, yd in con.execute("SELECT seq, par, strokes, putts, length_yd FROM holes WHERE round_id=?", (rid,))}
         layout = {r["garmin_scorecard_id"]: r["layout"] for r in csv.DictReader(open(os.path.join(ROOT, "data/rounds", fname), encoding="utf-8-sig"))}
         cid_layout = {}
         for sid, lay in layout.items():
@@ -576,11 +576,16 @@ def section_courses(con):
         c = courses.setdefault(short, {"name": course, "pins": [], "short": short, "layouts": {}, "last": date, "rounds": set()})
         c["last"] = date; c["rounds"].add(rid); c["pins"] += pins
         for H in g["holes"]:
-            par, st, putts = hrow.get(H["n"], (H["par"], None, None))
+            par, st, putts, yd = hrow.get(H["n"], (H["par"], None, None, None))
             L = c["layouts"].setdefault(H["cid"], {"cid": H["cid"], "label": (per[H["n"] - 1] if per and H["n"] <= len(per) else "") or cid_layout.get(H["cid"], ""), "holes": {}})
-            hh = L["holes"].setdefault(H["h"], {"h": H["h"], "par": par, "plays": []})
+            hh = L["holes"].setdefault(H["h"], {"h": H["h"], "par": par, "plays": [], "yds": []})
+            if yd: hh["yds"].append(yd)
             hh["plays"].append({"date": date, "st": st, "putts": putts, "pin": H["pin"], "shots": H["shots"]})
     out = []
+    for c in courses.values():
+        for L in c["layouts"].values():
+            for hh in L["holes"].values():
+                y = sorted(hh.pop("yds")); hh["yd"] = round(y[len(y) // 2]) if y else None      # 洞長：歷次開球點到旗桿的中位數
     for c in sorted(courses.values(), key=lambda c: c["last"], reverse=True):
         lays = [{"cid": L["cid"], "label": L["label"], "holes": [L["holes"][k] for k in sorted(L["holes"])]} for L in c["layouts"].values()]
         ll = [round(sum(p[0] for p in c["pins"]) / len(c["pins"]), 4), round(sum(p[1] for p in c["pins"]) / len(c["pins"]), 4)] if c["pins"] else None
@@ -644,7 +649,7 @@ def section_roundlist(con):
             holes.append([hole, par, yd, [[c or "?", d] for c, d in shots], putts, src == "estimated", st])
         pv = [h[4] for h in holes if h[4] is not None]
         out.append({"date": date, "course": course, "short": short, "tag": tags.get(cat, ""), "cat": {"full_18": "full", "short_course": "short"}.get(cat, "partial"), "n": n, "strokes": strokes, "over": over, "hcp": diff,
-                    "putts": sum(pv) if pv else None, "est": any(h[5] for h in holes), "holes": holes, "gps": round_gps(fname), "parts": round_parts(fname)[0], "combo": round_parts(fname)[1]})
+                    "putts": sum(pv) if pv else None, "est": any(h[5] for h in holes), "holes": holes, "len": {seq: round(yd) for seq, yd in con.execute("SELECT seq, length_yd FROM holes WHERE round_id=? AND length_yd>0", (rid,))}, "gps": round_gps(fname), "parts": round_parts(fname)[0], "combo": round_parts(fname)[1]})
     note = "由新到舊排列，預設只列完整打完 18 洞的場次，上方按鈕可加入未打完與短球場的場次。點任一場展開 18 洞明細。" \
            "擊球欄是被手錶記錄到的擊球，依序為球桿與距離（碼）。沒有手錶紀錄的洞，推桿數由「總桿 − 記錄擊球 − 罰桿」推算。"
     return {"id": "rounds", "title": "場次總表", "note": note, "kind": "roundlist", "data": out, "table": {"head": [], "rows": []}}
@@ -1163,7 +1168,7 @@ DRAW.courses = (sec, host) => {
     `<span><svg width="20" height="14"><line x1="1" y1="7" x2="19" y2="7" stroke="var(--ink2)" stroke-width="1.2"/></svg>切球桿</span><span>越淡＝越早的場次</span>`;
   const fig = (L, H) => { const f = document.createElement("figure"), geo = (REPORT.geo[L.cid] || {})[H.h] || {}, P = H.plays, sts = P.map(p => p.st).filter(v => v != null);
     const dr = P.map(p => p.shots[0]).filter(s => s && s[1] === "d"), fw = dr.filter(s => s[7] === "Fairway").length;
-    h("figcaption", "", f, `第 ${H.h} 洞　Par ${H.par}`);
+    h("figcaption", "", f, `第 ${H.h} 洞　Par ${H.par}` + (H.yd ? `　${H.yd} 碼` : ""));
     const st = h("div", "cstat", f); st.innerHTML = `<span>打過 <b>${P.length}</b> 次</span>` + (sts.length ? `<span>平均 <b>${(sts.reduce((a, b) => a + b, 0) / sts.length).toFixed(1)}</b> 桿</span><span>最好 <b>${Math.min(...sts)}</b></span>` : "") + (dr.length ? `<span>一號木上球道 <b>${fw}/${dr.length}</b></span>` : "");
     const pts = []; (geo.outline || []).forEach(p => pts.push(...p)); P.forEach(p => { p.shots.forEach(s => pts.push([s[2], s[3]], [s[4], s[5]])); if (p.pin) pts.push(p.pin); }); const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
     if (pts.length) { const pad = geo.outline ? 10 : 40, x0 = Math.min(...xs) - pad, y0 = Math.min(...ys) - pad, w = Math.max(...xs) - x0 + pad, hh = Math.max(...ys) - y0 + pad, k = Math.max(w, hh) / 330;
@@ -1249,7 +1254,7 @@ DRAW.roundlist = (sec, host) => {
   // ----- 球道圖：一次看幾洞，用 Garmin 地圖描出來的輪廓加上每一桿的路線 -----
   const MAPC = { outline: "#2f5d2a", tree: "#1c3a1e", fairway: "#58963f", water: "#3c6edc", sand: "#e1cdaa", green: "#8ccd6e" }, SHOTC = { d: "#ff5a5a", w: "#ffa51f", i: "#5aa9ff", c: "#ffffff" };
   const holeMap = (r, H, hpx, brief) => { const geo = (REPORT.geo[H.cid] || {})[H.h] || {}, fig = document.createElement("figure"), st = (r.holes[H.n - 1] || [])[6];
-    const par = H.par || (r.holes[H.n - 1] || [])[1], zone = r.parts && r.parts[H.n - 1] ? `　${r.parts[H.n - 1]} ${H.h}` : ""; h("figcaption", "", fig, brief ? `${H.n}　P${par}` + (st ? `　${st}` : "") : (zone && NARROW() ? `${H.n}${zone}　P${par}` : `第 ${H.n} 洞${zone}　Par ${par}`) + (st ? `　${st} 桿` : ""));
+    const par = H.par || (r.holes[H.n - 1] || [])[1], zone = r.parts && r.parts[H.n - 1] ? `　${r.parts[H.n - 1]} ${H.h}` : ""; h("figcaption", "", fig, brief ? `${H.n}　P${par}` + (st ? `　${st}` : "") : (zone && NARROW() ? `${H.n}${zone}　P${par}` : `第 ${H.n} 洞${zone}　Par ${par}`) + (r.len && r.len[H.n] ? `　${r.len[H.n]} 碼` : "") + (st ? `　${st} 桿` : ""));
     const pts = [].concat(...(geo.outline || []), ...H.shots.map(s => [[s[2], s[3]], [s[4], s[5]]]), H.pin ? [H.pin] : []), xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
     if (!pts.length) return fig;
     const pad = geo.outline ? 10 : 40, x0 = Math.min(...xs) - pad, y0 = Math.min(...ys) - pad, w = Math.max(...xs) - x0 + pad, hh = Math.max(...ys) - y0 + pad, k = Math.max(w, hh) / 300;
