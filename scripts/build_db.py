@@ -42,7 +42,7 @@ CREATE TABLE rounds(round_id INTEGER PRIMARY KEY, file TEXT, date TEXT, course T
   rating REAL, slope REAL, rating_approx INTEGER, adj_strokes INTEGER, differential REAL, course_short TEXT);
 CREATE TABLE holes(round_id INTEGER, seq INTEGER, hole INTEGER, layout TEXT, par INTEGER, strokes INTEGER, over_par INTEGER,
   putts INTEGER, putts_source TEXT, unrecorded INTEGER, penalties INTEGER, fairway TEXT, length_m INTEGER, length_yd INTEGER,
-  shots_recorded INTEGER, PRIMARY KEY(round_id, seq));
+  shots_recorded INTEGER, strokes_to_green INTEGER, first_putt_steps INTEGER, PRIMARY KEY(round_id, seq));
 CREATE TABLE shots(round_id INTEGER, seq INTEGER, shot_no INTEGER, club TEXT, shot_type TEXT, start_lie TEXT, end_lie TEXT,
   distance_m INTEGER, distance_yd INTEGER, to_pin_start_m INTEGER, to_pin_end_m INTEGER);
 """)
@@ -62,8 +62,8 @@ for rid, path in enumerate(sorted(glob.glob(os.path.join(ROUNDS, "*.csv"))), 1):
         tot += st; par += p; nshots += len(ss); adj += min(st, p + HOLE_CAP); has_putts |= r["putts_source"] in ("garmin", "manual")
         nonputt = sum(1 for s in ss if s["shot_type"] != "PUTT")
         unrec = None if putts is None else max(st - nonputt - (pen or 0) - putts, 0)   # 手錶漏記的擊球數
-        con.execute("INSERT INTO holes VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (rid, seq, int(r["hole"]), r["layout"], p, st, st - p, putts, r["putts_source"], unrec,
-            pen, r["fairway"], m, round(m * YD) if m else None, len(ss)))
+        con.execute("INSERT INTO holes VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (rid, seq, int(r["hole"]), r["layout"], p, st, st - p, putts, r["putts_source"], unrec,
+            pen, r["fairway"], m, round(m * YD) if m else None, len(ss), int(r["strokes_to_green"]) if r.get("strokes_to_green") else None, int(r["first_putt_steps"]) if r.get("first_putt_steps") else None))
         for s in ss:
             d = n(s["distance_m"])
             con.execute("INSERT INTO shots VALUES(?,?,?,?,?,?,?,?,?,?,?)", (rid, seq, int(s["shot_no"]), s["club"], s["shot_type"],

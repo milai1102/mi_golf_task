@@ -47,9 +47,11 @@ def main(force):
         name = zh.get(club, club)
         path = os.path.join(ROUNDS, f"{date}_{name.replace(' ', '_').replace('&', 'and')}.csv")
         keep = {}                                         # 既有檔案的列（保留人工修正），依計分卡編號分組
+        head, sidx = HEADER, len(HEADER) - 1
         if os.path.exists(path) and not force:
-            for r in csv.reader(open(path, encoding="utf-8-sig")):
-                if r and r[0] != "date": keep.setdefault(r[-1], []).append(r)
+            for r in csv.reader(open(path, encoding="utf-8-sig")):                # 場次檔可能有人工加的欄位（手記的 strokes_to_green、first_putt_steps），依欄名找計分卡編號並保留原表頭
+                if r and r[0] in ("date", "\ufeffdate"): head = r; sidx = r.index("garmin_scorecard_id")
+                elif r: keep.setdefault(r[sidx], []).append(r)
             if all(cards[sid][1] in keep for sid in sids):
                 skipped += 1; continue                    # 沒有新的計分卡 → 不動
             merged += 1                                   # 同日同球場來了新計分卡（例如後九）→ 自動併入
@@ -71,7 +73,7 @@ def main(force):
                 for s in ss:
                     rows.append(base + [s[2], clubs.get(s[3], "未知球桿"), TYPE[s[4]], LIE[s[5]], LIE[s[6]], s[7], s[8], s[9], c[1]])
         with open(path, "w", newline="", encoding="utf-8-sig") as f:
-            w = csv.writer(f); w.writerow(HEADER); w.writerows(rows)
+            w = csv.writer(f); w.writerow(head); w.writerows(r + [""] * (len(head) - len(r)) for r in rows)
         made += 1
     print(f"場次檔：寫入 {made}（其中併入新計分卡 {merged}），已存在略過 {skipped}")
 
