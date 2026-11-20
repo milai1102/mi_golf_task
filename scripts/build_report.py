@@ -642,6 +642,16 @@ def section_plan(con):
 
 def section_roundlist(con):
     tags = {"short_course": "短球場", "partial": "未打完", "nine": "9 洞"}; out = []
+    CLUBS = ["一號木桿", "鐵木桿", "6鐵", "7鐵", "8鐵", "9鐵", "P杆"]      # 「各桿距離」只列全揮桿的球桿
+    order = [r[0] for r in con.execute("SELECT round_id FROM rounds WHERE category != 'short_course' ORDER BY date")]
+    dist = {}
+    for rid_, club_, yd_ in con.execute("SELECT round_id, club, distance_yd FROM shots WHERE distance_yd IS NOT NULL AND shot_type != 'PUTT'"): dist.setdefault((rid_, club_), []).append(yd_)
+    def med(rids, club):
+        d = sorted(x for r_ in rids for x in dist.get((r_, club), []))
+        return [round(d[(len(d) - 1) // 2]), len(d)] if d else None
+    def club_table(rid):
+        prev = order[:order.index(rid)] if rid in order else order
+        return [[c, med([rid], c), med(prev[-RECENT_N:], c), med(prev, c)] for c in CLUBS if med([rid], c)]
     for rid, date, course, cat, n, strokes, over, diff, short, fname in con.execute("SELECT round_id, date, course, category, holes_played, strokes, over_par, differential, course_short, file FROM rounds ORDER BY date DESC"):
         holes = []
         for seq, hole, par, st, putts, src, yd in con.execute("SELECT seq, hole, par, strokes, putts, putts_source, length_yd FROM holes WHERE round_id=? ORDER BY seq", (rid,)):
@@ -649,7 +659,7 @@ def section_roundlist(con):
             holes.append([hole, par, yd, [[c or "?", d] for c, d in shots], putts, src == "estimated", st])
         pv = [h[4] for h in holes if h[4] is not None]
         out.append({"date": date, "course": course, "short": short, "tag": tags.get(cat, ""), "cat": {"full_18": "full", "short_course": "short"}.get(cat, "partial"), "n": n, "strokes": strokes, "over": over, "hcp": diff,
-                    "putts": sum(pv) if pv else None, "est": any(h[5] for h in holes), "holes": holes, "len": {seq: round(yd) for seq, yd in con.execute("SELECT seq, length_yd FROM holes WHERE round_id=? AND length_yd>0", (rid,))}, "gps": round_gps(fname), "parts": round_parts(fname)[0], "combo": round_parts(fname)[1]})
+                    "putts": sum(pv) if pv else None, "est": any(h[5] for h in holes), "holes": holes, "len": {seq: round(yd) for seq, yd in con.execute("SELECT seq, length_yd FROM holes WHERE round_id=? AND length_yd>0", (rid,))}, "clubs": club_table(rid), "gps": round_gps(fname), "parts": round_parts(fname)[0], "combo": round_parts(fname)[1]})
     note = "由新到舊排列，預設只列完整打完 18 洞的場次，上方按鈕可加入未打完與短球場的場次。點任一場展開 18 洞明細。" \
            "擊球欄是被手錶記錄到的擊球，依序為球桿與距離（碼）。沒有手錶紀錄的洞，推桿數由「總桿 − 記錄擊球 − 罰桿」推算。"
     return {"id": "rounds", "title": "場次總表", "note": note, "kind": "roundlist", "data": out, "table": {"head": [], "rows": []}}
@@ -852,7 +862,7 @@ nav{margin:10px 0 0}nav a{font-size:12px;padding:3px 10px}
 .pgoal{border:1px solid var(--border);border-radius:14px;padding:18px 14px;text-align:center;background:var(--page)}.pgoal .big{font-size:44px;font-weight:700;line-height:1.15;margin:4px 0 6px}.plan .k{font-size:13px;color:var(--ink2)}
 .ptiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}.ptile{border:1px solid var(--border);border-radius:12px;padding:12px 10px;text-align:center;background:var(--page)}.ptile .v{font-size:24px;font-weight:700;margin:2px 0}
 .ptab{width:100%;margin-top:12px;font-size:14px;font-variant-numeric:tabular-nums}.ptab th{font-size:12px;color:var(--muted);font-weight:500}.ptab th,.ptab td{text-align:center;padding:7px 4px;border-bottom:1px solid var(--grid)}.ptab td.ok{color:var(--up);font-weight:700}.ptab td.no{color:var(--ink2)}.ptab td.strong{font-weight:700;font-size:16px}
-.plan .cap{font-size:12px;color:var(--muted);margin-top:6px;text-align:center}
+.plan .cap,.panel .cap{font-size:12px;color:var(--muted);margin-top:6px;text-align:center}
 .pcard{display:flex;gap:12px;border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:10px;background:var(--page)}.pcard .num{flex:none;width:28px;height:28px;border-radius:50%;background:var(--ink);color:var(--surface);display:flex;align-items:center;justify-content:center;font-size:15px}
 .pcard .t{font-size:17px;font-weight:700}.pcard .f{font-size:13px;color:var(--trend);margin:2px 0 4px}.pcard .b{font-size:14px;color:var(--ink2);line-height:1.6}.pcard.rule{border-color:var(--series)}.pcard .tg{color:var(--up)}.pcard .f{color:var(--muted)}.pcard ol{margin:0;padding-left:22px;font-size:17px;font-weight:600;line-height:2}
 .plater{font-size:15px;color:var(--ink2);line-height:1.9;margin:0;padding-left:22px}.plan .lead+h3{margin-top:8px}
@@ -1283,10 +1293,15 @@ DRAW.roundlist = (sec, host) => {
   const detail = r => { const box = document.createElement("div"); h("div", "scname", box, r.course); box.appendChild(card(r));
     const tabs = h("div", "tabs", box), panel = h("div", "panel", box); let open = null;
     const items = [["逐洞擊球明細", p => p.appendChild(shotsTable(r))]];
+    if (r.clubs && r.clubs.length) items.push(["各桿距離", p => clubPanel(r, p)]);
     if (r.gps) { items.push(["一號木開球", p => drivePanel(r, p)]); items.push(["球道揮桿圖", p => mapPanel(r, p)]); }
     items.forEach(([label, fill]) => { const b = h("button", "fchip", tabs, label);
       b.addEventListener("click", () => { const was = open === label; open = was ? null : label; panel.replaceChildren(); [...tabs.children].forEach(c => c.classList.toggle("on", !was && c === b)); if (!was) fill(panel); }); });
     return box; };
+  const clubPanel = (r, p) => { const tb = h("table", "ptab", p), hr = h("tr", "", tb); ["球桿", "這一場", "之前 " + REPORT.recent_n + " 場", "之前全部"].forEach(x => h("th", "", hr, x));
+    const cell = (tr, v, strong) => { const td = h("td", strong ? "strong" : "", tr); if (!v) { td.textContent = "—"; return; } td.textContent = v[0]; const sm = h("span", "", td, " (" + v[1] + ")"); sm.style.cssText = "font-size:11px;font-weight:400;color:var(--muted)"; };
+    r.clubs.forEach(([c, a, b, d]) => { const tr = h("tr", "", tb); h("td", "", tr, c); cell(tr, a, 1); cell(tr, b); cell(tr, d); });
+    h("div", "cap", p, "常態距離（中位數，碼），括號是球數"); };
   const shotsTable = r => { const box = document.createElement("div"), tb = h("table", "rt", box), hh = h("tr", "", tb);
     ["洞", "標準桿", "洞長", "擊球", "推桿", "桿數", "±"].forEach(x => h("th", "", hh, x));
     r.holes.forEach(([hole, par, yd, shots, putts, est, st]) => { const tr = h("tr", "", tb);
@@ -1388,7 +1403,7 @@ def main():
     for fname, title, sections, link in pages:
         secs = [f(con) for f in sections]
         for x in secs: x["short"] = NAV_SHORT.get(x["id"], x["title"])          # 導覽列只放簡稱，不放說明
-        report = {"meta": meta, "title": title, "link": link, "success": SUCCESS, "sections": secs, "tabs": tabs, "page": fname, "geo": GEO if any(x["kind"] in ("roundlist", "courses") for x in secs) else {}}
+        report = {"meta": meta, "title": title, "link": link, "success": SUCCESS, "recent_n": RECENT_N, "sections": secs, "tabs": tabs, "page": fname, "geo": GEO if any(x["kind"] in ("roundlist", "courses") for x in secs) else {}}
         path = os.path.join(os.path.dirname(OUT), fname)
         open(path, "w", encoding="utf-8").write(PAGE.replace("__DATA__", json.dumps(report, ensure_ascii=False)))
         print("已產生", path, "|", len(sections), "個區塊")
