@@ -819,7 +819,7 @@ section h2{font-size:18px;font-weight:600;margin:0 0 4px}
 select{font:inherit;font-size:14px;padding:6px 10px;border:1px solid var(--axis);border-radius:8px;background:var(--surface);color:var(--ink);margin-bottom:8px;max-width:100%}
 .rt{width:100%}.rt td,.rt th{text-align:center;padding:6px 8px}.rt td.shots{text-align:left}
 .chip{display:inline-block;border:1px solid var(--border);border-radius:6px;padding:1px 7px;margin:2px 4px 2px 0;font-size:12px;white-space:nowrap}.chip b{font-weight:500}.chip span{color:var(--ink2)}
-.rt td.bad{color:#d03b3b;font-weight:600}.rt td.good{color:#0c8a0c;font-weight:600}.rt tr.tot td{font-weight:600;border-top:1px solid var(--axis)}
+.rt td.bad{color:#d03b3b;font-weight:600}.rt td.good{color:#0c8a0c;font-weight:600}.rt tr.tot td{font-weight:600;border-top:1px solid var(--axis)}.rt tr.nine td{border-bottom:2px solid var(--axis);background:color-mix(in srgb,var(--ink) 6%,transparent)}
 .rl{width:100%}.rl th,.rl td{text-align:center;padding:8px 8px}.rl td.course,.rl th:nth-child(2){text-align:left}.rl td.strong{font-weight:600}.rl td.zero{color:var(--up);font-weight:600}
 .rl tr.row{cursor:pointer}.rl tr.row:hover{background:var(--page)}.rl tr.more{display:none}.rl.all tr.more{display:table-row}.rl td.arrow{color:var(--muted);width:28px}
 .rl tr.detail>td{padding:4px 0 16px 24px;background:var(--page)}.tag{white-space:nowrap;font-size:11px;color:var(--ink2);border:1px solid var(--border);border-radius:999px;padding:0 7px;margin-left:8px}
@@ -1324,12 +1324,14 @@ DRAW.roundlist = (sec, host) => {
   const shotsTable = r => { const box = document.createElement("div"), tb = h("table", "rt", box), hh = h("tr", "", tb);
     ["洞", "Par", "碼", "擊球", "推", "桿", "±"].forEach(x => h("th", "", hh, x));
     const AB = { "一號木桿": "1W", "三號木杆": "3W", "鐵木桿": "H", "P杆": "P", "A杆": "A", "Putter": "PT" }, ab = c => AB[c] || String(c).replace(/^(\d)鐵$/, "$1i").replace(/^(\d\d)度$/, "$1°");
-    r.holes.forEach(([hole, par, yd, shots, putts, est, st]) => { const tr = h("tr", "", tb);
+    r.holes.forEach(([hole, par, yd, shots, putts, est, st], i) => { const tr = h("tr", "", tb);
       h("td", "", tr, hole); h("td", "", tr, par); h("td", "", tr, yd || ""); const td = h("td", "shots", tr);
       shots.forEach(([c, dd]) => { const b = h("span", "chip", td); h("b", "", b, ab(c)); h("span", "", b, " " + dd); b.title = c; });
       h("td", "", tr, putts == null ? "" : putts); h("td", "", tr, st);
-      const dv = st - par; h("td", dv >= 3 ? "bad" : dv <= 0 ? "good" : "", tr, dv > 0 ? "+" + dv : dv === 0 ? "E" : dv); });
-    h("p", "note", box, "1W 一號木　H 鐵木桿　6i 六鐵　P、A 是 P 杆、A 杆　PT 推桿　數字是碼");
+      const dv = st - par; h("td", dv >= 3 ? "bad" : dv <= 0 ? "good" : "", tr, dv > 0 ? "+" + dv : dv === 0 ? "E" : dv);
+      if (r.holes.length > 9 && (i % 9 === 8 || i === r.holes.length - 1)) { const k = i - i % 9, part = r.holes.slice(k, i + 1), t2 = h("tr", "tot nine", tb), nm = h("td", "", t2, r.parts && r.parts[k] ? r.parts[k] : k === 0 ? "前九" : k === 9 ? "後九" : ""); nm.colSpan = 4; nm.style.textAlign = "left";
+        h("td", "", t2, part.every(x => x[4] != null) ? part.reduce((a, x) => a + x[4], 0) : ""); h("td", "", t2, part.reduce((a, x) => a + x[6], 0)); h("td", "", t2, ""); } });
+    h("p", "note", box, "1W 一號木　H 鐵木　6i 六鐵　PT 推桿　單位：碼");
     return box; };
   const T = sec.targets || {}, full = r => r.cat === "full";
   const FLAT = 2, F5 = sec.data.filter(full).slice(0, 5), AVG5 = F5.length ? F5.reduce((a, r) => a + r.strokes, 0) / F5.length : null;
