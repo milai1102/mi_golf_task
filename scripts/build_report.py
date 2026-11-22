@@ -597,6 +597,7 @@ def section_courses(con):
 # ---- 訓練計劃（第四個頁籤）：目標與計劃的文字在這裡改，數字由資料算出 ----
 PLAN_START = "2026-11-16"          # 計劃定案的日期，這一天之後的場次才算「計劃開始後」
 PLAN_GOAL = {"score": 95, "by": "2026 年底前", "next": "明年第一季 90"}
+PLAN_THREE = 7                     # 每場三推幾洞以下
 PLAN_BLOW = 1                      # 每場爆桿幾洞以下（推桿的門檻用 TARGET_ROUND_PUTTS）
 PLAN_BAG = [["鐵木桿", "120 碼以上"], ["6鐵", "長草、斜坡"], ["8鐵", "100 到 120"], ["P杆", "80 到 100"], ["A杆", "80 以內"]]   # 選桿表：球桿、用在哪個距離（使用者決定，減法原則）
 PLAN_TRAIN = [["長推", "三推 7 洞以下", "下場前在練習果嶺推 8 到 15 步"],          # 標題、目標、怎麼練（都要短）
@@ -660,9 +661,9 @@ def section_roundlist(con):
         pv = [h[4] for h in holes if h[4] is not None]
         out.append({"date": date, "course": course, "short": short, "tag": tags.get(cat, ""), "cat": {"full_18": "full", "short_course": "short"}.get(cat, "partial"), "n": n, "strokes": strokes, "over": over, "hcp": diff,
                     "putts": sum(pv) if pv else None, "est": any(h[5] for h in holes), "holes": holes, "len": {seq: round(yd) for seq, yd in con.execute("SELECT seq, length_yd FROM holes WHERE round_id=? AND length_yd>0", (rid,))}, "clubs": club_table(rid), "gps": round_gps(fname), "parts": round_parts(fname)[0], "combo": round_parts(fname)[1]})
-    note = "由新到舊排列，預設只列完整打完 18 洞的場次，上方按鈕可加入未打完與短球場的場次。點任一場展開 18 洞明細。" \
+    note = "由新到舊排列，預設只列完整打完 18 洞的場次，上方按鈕可加入未打完與短球場的場次。每張卡片的柱子是每一洞超出標準桿幾桿（Par 是一小段綠色、Birdie 是往下的藍色），下面的紅點是三推以上的洞；綠色的數字代表達到目標（總桿 %d、推桿 %d、三推 %d 洞、爆桿 %d 洞以下）。點任一場看計分卡與細節。" % (PLAN_GOAL["score"], TARGET_ROUND_PUTTS, PLAN_THREE, PLAN_BLOW) + \
            "擊球欄是被手錶記錄到的擊球，依序為球桿與距離（碼）。沒有手錶紀錄的洞，推桿數由「總桿 − 記錄擊球 − 罰桿」推算。"
-    return {"id": "rounds", "title": "場次總表", "note": note, "kind": "roundlist", "data": out, "table": {"head": [], "rows": []}}
+    return {"id": "rounds", "title": "場次", "note": note, "kind": "roundlist", "data": out, "targets": {"score": PLAN_GOAL["score"], "putts": TARGET_ROUND_PUTTS, "three": PLAN_THREE, "blow": PLAN_BLOW}, "table": {"head": [], "rows": []}}
 
 def handicap_index(diffs):
     """世界差點系統 (WHS)：取最近 20 場的差點微分，場數不足時照官方對照表取最好的幾場平均。"""
@@ -772,8 +773,9 @@ def with_trend(section, unit):
     return lambda con: add_trend(section(con), unit)
 
 # 主頁：6 個區塊
-MAIN = [section_roundlist, section_score_trend, section_handicap,                 # 我有沒有進步？
-        section_club_distance,                                  # 每支桿可以期待什麼？
+MAIN = [section_roundlist]                                      # 場次：最近打得怎麼樣（卡片）
+DATA = [section_club_distance,                                  # 數據：每支桿可以期待什麼？（使用者指定排第一）
+        section_score_trend, section_handicap,                  # 我有沒有進步？
         section_score_pair,                                     # 桿數丟在哪裡？
         section_putt_count]                                     # 推桿：一推、兩推、三推各幾洞（切球併入球桿距離圖）
 # 第二頁：重複、結論已確定、或樣本太少的圖
@@ -853,7 +855,7 @@ th{color:var(--ink2);font-weight:500}
 .maps svg{display:block;width:100%}.maps.strip{width:calc(100vw - 46px);display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;gap:8px;padding-bottom:6px}.maps.strip figure{flex:0 0 calc((100% - (var(--per) - 1) * 8px) / var(--per));scroll-snap-align:start}.sub{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:12px;color:var(--ink2);margin-top:6px}.sub .fchip{font-size:12px;padding:2px 10px}
 .ptabs{display:flex;margin:16px 0 4px;border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:4px;gap:4px}.ptabs a{flex:1;text-align:center;font-size:15px;font-weight:600;color:var(--ink2);text-decoration:none;padding:9px 6px;border-radius:9px;white-space:nowrap}.ptabs a.on{background:var(--ink);color:var(--surface)}
 nav{margin:10px 0 0}nav a{font-size:12px;padding:3px 10px}
-.morelink{display:none}
+.morelink{display:block;margin:20px 0 0;font-size:15px}.morelink a{display:inline-block;padding:8px 16px;border:1px solid var(--axis);border-radius:999px;color:var(--ink);text-decoration:none}
 .maps.strip.big{width:auto}.maps.strip.big figure{padding:10px 8px 8px}.maps.strip.big figcaption{font-size:15px;font-weight:600;color:#f0efec}
 .cstat{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 14px;font-size:12px;color:#c3c2b7;padding:2px 0 6px}.cstat b{color:#f0efec;font-weight:600}
 .cplays{width:100%;margin-top:6px;font-size:12px;color:#c3c2b7}.cplays td{padding:3px 4px;text-align:center;border-bottom:1px solid #2c2c2a;white-space:nowrap}.cplays td.bad{color:#f06a6a;font-weight:600}.cplays td.good{color:#2fbf4f;font-weight:600}
@@ -866,7 +868,23 @@ nav{margin:10px 0 0}nav a{font-size:12px;padding:3px 10px}
 .pcard{display:flex;gap:12px;border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:10px;background:var(--page)}.pcard .num{flex:none;width:28px;height:28px;border-radius:50%;background:var(--ink);color:var(--surface);display:flex;align-items:center;justify-content:center;font-size:15px}
 .pcard .t{font-size:17px;font-weight:700}.pcard .f{font-size:13px;color:var(--trend);margin:2px 0 4px}.pcard .b{font-size:14px;color:var(--ink2);line-height:1.6}.pcard.rule{border-color:var(--series)}.pcard .tg{color:var(--up)}.pcard .f{color:var(--muted)}.pcard ol{margin:0;padding-left:22px;font-size:17px;font-weight:600;line-height:2}
 .plater{font-size:15px;color:var(--ink2);line-height:1.9;margin:0;padding-left:22px}.plan .lead+h3{margin-top:8px}
-@media (max-width:640px){.ptabs a{font-size:13px;padding:9px 2px}}
+
+.ptabs{position:sticky;top:0;z-index:30}
+.rhd{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;color:var(--ink2);margin:2px 2px 8px}.rhd b{font-size:19px;color:var(--ink)}
+.r2{display:grid;grid-template-columns:372px minmax(0,1fr);gap:20px;align-items:start}.r2 .rlist{position:sticky;top:64px;max-height:calc(100vh - 84px);overflow-y:auto;padding-right:6px}.rpane{min-width:0;border:1px solid var(--border);border-radius:14px;padding:6px 18px 16px;background:var(--surface)}
+.rmonth{font-size:12px;color:var(--muted);padding:6px 4px;position:sticky;top:0;background:var(--surface);z-index:5}
+.rcard{border:1px solid var(--border);border-radius:14px;padding:12px 14px 10px;margin-bottom:10px;background:var(--page);cursor:pointer;outline:none}.rcard:hover,.rcard:focus-visible{border-color:var(--axis)}.rcard.on{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.rc1{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.rname{font-size:19px;font-weight:700;line-height:1.25}.rsub{font-size:12px;color:var(--muted)}
+.rtot{white-space:nowrap;line-height:1}.rtot b{font-size:36px;font-weight:700;font-variant-numeric:tabular-nums}.rtot span{font-size:13px;color:var(--muted);margin-left:6px}
+.rc2{display:flex;gap:18px;margin-top:6px;font-size:13px;color:var(--muted)}.rc2 b{font-size:16px;color:var(--ink);font-variant-numeric:tabular-nums}.rcard b.ok{color:var(--up)}
+.rbars{display:flex;gap:3px;align-items:flex-end;height:46px;padding-bottom:8px;margin-top:6px;box-sizing:border-box}.rbars i,.rdots i{flex:1;display:block;min-width:0}.rbars i.gap,.rdots i.gap{margin-left:9px}
+.rbars i{border-radius:2px 2px 0 0}.rbars i.p,.rlg i.p{background:var(--up);height:4px}.rbars i.g,.rlg i.g{background:var(--muted)}.rbars i.d,.rlg i.d{background:#ef9f27}.rbars i.x,.rlg i.x{background:var(--down)}.rbars i.b{background:var(--series);height:8px;margin-bottom:-8px;border-radius:0 0 2px 2px}.rlg i.b{background:var(--series)}
+.rdots{display:flex;gap:3px;height:6px;margin-top:3px}.rdots i.d::after{content:"";display:block;width:6px;height:6px;border-radius:50%;background:var(--down);margin:0 auto}
+.rsum{display:flex;gap:9px;margin-top:5px;font-size:12px;color:var(--muted)}.rsum b{font-size:14px;color:var(--ink)}.rsum span:last-child:not(:first-child){text-align:right}
+.rlg{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--muted);margin:10px 2px 0}.rlg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}.rlg i.dot{width:7px;height:7px;border-radius:50%;background:var(--down)}
+.maps figcaption{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rdet{margin:-4px 0 14px;padding:0 2px 8px;border-bottom:1px solid var(--grid)}.rdh{position:sticky;top:0;z-index:8;display:flex;justify-content:space-between;align-items:center;background:var(--surface);padding:8px 2px;border-bottom:1px solid var(--grid);font-size:14px;cursor:pointer}.rdh span{font-size:12px;color:var(--muted)}
+@media (max-width:640px){body{padding-bottom:calc(64px + env(safe-area-inset-bottom))}.ptabs{position:fixed;top:auto;bottom:0;left:0;right:0;margin:0;border-radius:0;border-width:1px 0 0;padding:6px 8px calc(6px + env(safe-area-inset-bottom))}.ptabs a{font-size:15px;padding:10px 2px}.rname{font-size:20px}}
 .cmap{height:360px;border-radius:12px;margin:4px 0 12px;overflow:hidden;background:var(--page);z-index:0}
 .leaflet-tooltip.ctip{background:rgba(17,17,16,.9);color:#f0efec;border:0;border-radius:6px;padding:2px 7px;font-size:12px;font-weight:600;box-shadow:none;white-space:nowrap}.leaflet-tooltip.ctip:before{display:none}.cmap .leaflet-interactive{cursor:pointer}.cmap .tdark{filter:invert(1) hue-rotate(180deg) brightness(.9) contrast(.9)}
 .hint{display:none;font-size:12px;color:var(--muted);margin:0 0 4px}
@@ -904,6 +922,7 @@ const heat = t => { const u = t * 2, a = STOPS[u < 1 ? 0 : 1], b = STOPS[u < 1 ?
 const PSTOPS = DARK ? [[57, 135, 229], [170, 105, 215], [235, 96, 96]] : [[42, 120, 214], [150, 90, 200], [227, 73, 72]];
 const prob = t => { const u = t * 2, a = PSTOPS[u < 1 ? 0 : 1], b = PSTOPS[u < 1 ? 1 : 2], f = u < 1 ? u : u - 1;
   return "rgb(" + a.map((v, i) => Math.round(v + (b[i] - v) * f)).join(",") + ")"; };
+const WIDE_R = () => innerWidth >= 900;
 const NARROW = () => innerWidth <= 640;
 // 寬度不夠時：圖照 min 寬度畫（字不縮小），外框改成可以左右滑動
 const wide = (host, min, mobile) => { const cw = host.clientWidth; if (cw >= min) return cw;
@@ -1206,9 +1225,9 @@ DRAW.courses = (sec, host) => {
 };
 
 DRAW.roundlist = (sec, host) => {
-  const SHOW = 10, cats = [["full", "完整 18 洞", true], ["partial", "未打完", false], ["short", "短球場", false]];
+  const cats = [["full", "完整 18 洞", true], ["partial", "未打完", false], ["short", "短球場", false]];
   const on = Object.fromEntries(cats.map(c => [c[0], c[2]])); let all = false;
-  const bar = h("div", "filters", host), t = h("table", "rl", host), more = h("button", "morebtn", host);
+
   // 計分卡：一眼看出每一洞的結果。框的畫法照一般計分卡：圓圈 Birdie、單框 Bogey、雙框 Double、+3 以上塗滿；下面的點是推桿數
   const mark = dv => dv <= -2 ? "eagle" : dv === -1 ? "birdie" : dv === 0 ? "" : dv === 1 ? "bogey" : dv === 2 ? "dbl" : "blow";
   const card = r => { const box = document.createElement("div"); box.className = "sc";
@@ -1275,7 +1294,7 @@ DRAW.roundlist = (sec, host) => {
       if (!thin) { el("circle", { cx: s[4], cy: s[5], r: 4.2 * k, fill: c, stroke: "#111", "stroke-width": 1 * k }, svg).appendChild(el("title", {}, null, `${s[0]} ${s[6]} 碼`)); } });
     if (H.pin) { const [px, py] = H.pin; el("line", { x1: px, y1: py, x2: px, y2: py - 16 * k, stroke: "#fff", "stroke-width": 1.5 * k }, svg); el("polygon", { points: `${px},${py - 16 * k} ${px + 9 * k},${py - 12.5 * k} ${px},${py - 9 * k}`, fill: "#ff3b3b" }, svg); }
     return fig; };
-  const mapPanel = (r, host) => { const strip = NARROW(); let per = strip ? 2 : 3, start = 0;   // 手機：全部的洞排成一橫列，左右滑動
+  const mapPanel = (r, host) => { const strip = NARROW(); let per = strip || WIDE_R() ? 2 : 3, start = 0;   // 手機：全部的洞排成一橫列，左右滑動
     const HS = r.gps.holes, sizes = strip ? [1, 2, 3] : [2, 3];
     const s1 = h("div", "sub", host), s2 = h("div", "sub", host), grid = h("div", "maps", host), lg = h("div", "legend", host);
     lg.innerHTML = [["d", "一號木"], ["w", "鐵木桿"], ["i", "鐵桿"]].map(([c, t]) => `<span><svg width="20" height="14"><line x1="1" y1="7" x2="13" y2="7" stroke="${SHOTC[c]}" stroke-width="2.4"/><circle cx="15" cy="7" r="3.6" fill="${SHOTC[c]}"/></svg>${t}</span>`).join("") +
@@ -1287,10 +1306,10 @@ DRAW.roundlist = (sec, host) => {
       if (per < HS.length) for (let i = 0; i < HS.length; i += per) { const b = h("button", "fchip" + (i === start ? " on" : ""), s2, `${HS[i].n}–${HS[Math.min(i + per, HS.length) - 1].n}`); b.addEventListener("click", () => { start = i; draw(); }); }
       const show = HS.slice(start, start + per), cols = per;
       grid.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`; const hpx = per === 2 ? 560 : 500;
-      show.forEach(H => grid.appendChild(holeMap(r, H, hpx, false))); };
+      show.forEach(H => grid.appendChild(holeMap(r, H, hpx, per === 3 && WIDE_R()))); };
     draw(); };
   // 點開一場：計分卡在上，下面一排按鈕選要看的細節
-  const detail = r => { const box = document.createElement("div"); h("div", "scname", box, r.course); box.appendChild(card(r));
+  const detail = r => { const box = document.createElement("div"); h("div", "scname", box, r.course + (WIDE_R() ? "　" + r.date : "")); box.appendChild(card(r));
     const tabs = h("div", "tabs", box), panel = h("div", "panel", box); let open = null;
     const items = [["逐洞擊球明細", p => p.appendChild(shotsTable(r))]];
     if (r.clubs && r.clubs.length) items.push(["各桿距離", p => clubPanel(r, p)]);
@@ -1310,24 +1329,36 @@ DRAW.roundlist = (sec, host) => {
       h("td", "", tr, putts == null ? "" : putts); h("td", "", tr, st);
       const dv = st - par; h("td", dv >= 3 ? "bad" : dv <= 0 ? "good" : "", tr, dv > 0 ? "+" + dv : dv === 0 ? "E" : dv); });
     return box; };
-  const draw = () => { t.replaceChildren(); const hr = h("tr", "", t);
-    ["日期", "球場", "總桿", "差點", "爆桿", "推桿", ""].forEach(x => h("th", "", hr, x));
-    const rows = sec.data.filter(r => on[r.cat]);
-    rows.slice(0, all ? rows.length : SHOW).forEach(r => { const tr = h("tr", "row", t);
-      h("td", "", tr, NARROW() ? r.date.slice(2).replace(/-/g, "/") : r.date); const c = h("td", "course", tr, r.short); if (r.tag) h("span", "tag", c, r.tag); if (r.combo) h("span", "tag", c, r.combo); if (r.n !== 18) h("span", "tag", c, r.n + " 洞");   // 18 洞是預設，不是 18 洞才標出來
-      h("td", "strong", tr, r.strokes); h("td", "", tr, r.hcp == null ? "" : r.hcp.toFixed(1)); const blow = r.holes.filter(x => x[6] - x[1] >= 3).length;   // 爆洞：+3 以上的洞數，0 用綠色
-      h("td", blow ? "" : "zero", tr, blow); h("td", "", tr, r.putts == null ? "" : r.putts);
-      const arrow = h("td", "arrow", tr, "▸");
-      tr.addEventListener("click", () => { const nx = tr.nextSibling;
-        if (nx && nx.classList.contains("detail")) { nx.remove(); arrow.textContent = "▸"; return; }
-        t.querySelectorAll("tr.detail").forEach(d => d.remove()); t.querySelectorAll("td.arrow").forEach(a => a.textContent = "▸");   // 一次只展開一場
-        const top0 = tr.getBoundingClientRect().top;
-        const dr = document.createElement("tr"); dr.className = "detail"; const td = h("td", "", dr); td.colSpan = 7; td.appendChild(detail(r));
-        tr.after(dr); arrow.textContent = "▾"; scrollBy(0, tr.getBoundingClientRect().top - top0); }); });
-    more.style.display = rows.length > SHOW ? "" : "none"; more.textContent = all ? `只顯示最近 ${SHOW} 場` : `顯示全部 ${rows.length} 場`; };
-  cats.forEach(([key, label]) => { const n = sec.data.filter(r => r.cat === key).length, b = h("button", "fchip" + (on[key] ? " on" : ""), bar, `${label} ${n}`);
+  const T = sec.targets || {}, full = r => r.cat === "full";
+  const blowOf = r => r.holes.filter(x => x[6] - x[1] >= 3).length, threeOf = r => r.holes.filter(x => x[4] >= 3).length;
+  const lvl = dv => dv <= -1 ? "b" : dv === 0 ? "p" : dv === 1 ? "g" : dv === 2 ? "d" : "x";
+  const cardEl = r => { const c = document.createElement("div"); c.className = "rcard"; c.tabIndex = 0;
+    const top = h("div", "rc1", c), L = h("div", "", top), nm = h("div", "rname", L, r.short), sub = h("div", "rsub", L, r.date.slice(5).replace("-", "/") + (r.date.slice(0, 4) !== String(new Date().getFullYear()) ? "/" + r.date.slice(2, 4) : ""));
+    [r.combo, r.tag, r.n !== 18 ? r.n + " 洞" : ""].filter(Boolean).forEach(x => h("span", "", sub, "　" + x));
+    const R = h("div", "rtot", top); h("b", full(r) && T.score && r.strokes <= T.score ? "ok" : "", R, r.strokes); h("span", "", R, (r.over > 0 ? "+" : "") + r.over);
+    const st = h("div", "rc2", c), stat = (k, v, ok) => { const d = h("div", "", st); h("span", "", d, k + " "); h("b", ok ? "ok" : "", d, v == null ? "—" : v); };
+    stat("推桿", r.putts, full(r) && r.putts != null && r.putts <= T.putts); stat("三推", r.putts == null ? null : threeOf(r), full(r) && threeOf(r) <= T.three); stat("爆桿", blowOf(r), full(r) && blowOf(r) <= T.blow);
+    const bars = h("div", "rbars", c), dots = h("div", "rdots", c);
+    r.holes.forEach((x, i) => { const g = i && i % 9 === 0 ? " gap" : "", dv = x[6] - x[1], b = h("i", lvl(dv) + g, bars); if (dv > 0) b.style.height = Math.min(4 + dv * 10, 36) + "px"; h("i", (x[4] >= 3 ? "d" : "") + g, dots); });
+    if (r.holes.length > 9) { const ft = h("div", "rsum", c); for (let i = 0; i < r.holes.length; i += 9) { const part = r.holes.slice(i, i + 9), sp = h("span", "", ft, (r.parts && r.parts[i] ? r.parts[i] : i === 0 ? "前九" : i === 9 ? "後九" : "") + " "); sp.style.flex = part.length; h("b", "", sp, part.reduce((a, x) => a + x[6], 0)); } }
+    return c; };
+  const WIDE = innerWidth >= 900; let sel = null;
+  const head = h("div", "rhd", host), bar2 = h("div", "filters", host), wrap = h("div", WIDE ? "r2" : "r1", host), list = h("div", "rlist", wrap), pane = WIDE ? h("div", "rpane", wrap) : null;
+  const draw = () => { list.replaceChildren(); if (pane) pane.replaceChildren();
+    const rows = sec.data.filter(r => on[r.cat]); let month = "";
+    const pick = (r, c) => { if (WIDE) { list.querySelectorAll(".rcard.on").forEach(x => x.classList.remove("on")); c.classList.add("on"); sel = r; pane.replaceChildren(); pane.appendChild(detail(r)); pane.scrollTop = 0; return; }
+      const nx = c.nextSibling, was = nx && nx.classList.contains("rdet"); const top0 = c.getBoundingClientRect().top;
+      list.querySelectorAll(".rdet").forEach(d => d.remove()); list.querySelectorAll(".rcard.on").forEach(x => x.classList.remove("on"));
+      if (!was) { const d = document.createElement("div"); d.className = "rdet"; const hd = h("div", "rdh", d); h("b", "", hd, r.short + "　" + r.date.slice(5).replace("-", "/") + "　" + r.strokes + " 桿"); h("span", "", hd, "收合 ▴"); hd.addEventListener("click", () => pick(r, c)); d.appendChild(detail(r)); c.after(d); c.classList.add("on"); }
+      scrollBy(0, c.getBoundingClientRect().top - top0); };
+    rows.forEach(r => { const m = r.date.slice(0, 7); if (m !== month) { month = m; h("div", "rmonth", list, m.slice(0, 4) + " 年 " + (+m.slice(5)) + " 月"); }
+      const c = cardEl(r); list.appendChild(c); c.addEventListener("click", () => pick(r, c));
+      c.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(r, c); } const dir = e.key === "ArrowDown" ? 1 : e.key === "ArrowUp" ? -1 : 0; if (!dir) return; e.preventDefault(); const cs = [...list.querySelectorAll(".rcard")], t2 = cs[cs.indexOf(c) + dir]; if (t2) { t2.focus(); if (WIDE) t2.click(); } }); });
+    if (WIDE && rows.length) { const cs = [...list.querySelectorAll(".rcard")], i = Math.max(0, rows.indexOf(sel)); pick(rows[i], cs[i]); } };
+  { const f5 = sec.data.filter(full).slice(0, 5); if (f5.length) { h("span", "", head, "最近 " + f5.length + " 場"); const sp = h("span", "", head); sp.append("平均 "); h("b", "", sp, (f5.reduce((a, r) => a + r.strokes, 0) / f5.length).toFixed(1)); sp.append("　最好 "); h("b", "", sp, Math.min(...f5.map(r => r.strokes))); } }
+  cats.forEach(([key, label]) => { const n = sec.data.filter(r => r.cat === key).length, b = h("button", "fchip" + (on[key] ? " on" : ""), bar2, `${label} ${n}`);
     b.addEventListener("click", () => { on[key] = !on[key]; b.classList.toggle("on", on[key]); draw(); }); });
-  more.addEventListener("click", () => { all = !all; draw(); });
+  { const lg = h("div", "rlg", host); [["p", "Par"], ["g", "Bogey"], ["d", "Double"], ["x", "爆桿"], ["b", "Birdie"]].forEach(([k, t]) => { const sp = h("span", "", lg); h("i", k, sp); sp.append(t); }); const sp = h("span", "", lg); h("i", "dot", sp); sp.append("三推以上"); h("span", "", lg, "柱子越高＝超出標準桿越多"); }
   draw();
 };
 
@@ -1358,8 +1389,8 @@ DRAW.plan = (sec, host) => {
 
 document.getElementById("meta").textContent = REPORT.meta;
 document.getElementById("h1").textContent = REPORT.title; document.title = REPORT.title;
-(REPORT.tabs || []).forEach(([href, label]) => { const a = h("a", href === REPORT.page ? "on" : "", document.getElementById("ptabs"), label); a.href = href; });
-{ const a = document.getElementById("link"); a.textContent = REPORT.link[1]; a.href = REPORT.link[0]; }
+(REPORT.tabs || []).forEach(([href, label]) => { const a = h("a", href === (REPORT.tab || REPORT.page) ? "on" : "", document.getElementById("ptabs"), label); a.href = href; });
+{ const a = document.getElementById("link"); if (REPORT.link) { a.textContent = REPORT.link[1]; a.href = REPORT.link[0]; } else a.parentNode.style.display = "none"; }
 const main = document.getElementById("main"), nav = document.getElementById("nav");
 function render() {
   main.replaceChildren(); nav.replaceChildren();
@@ -1394,16 +1425,17 @@ def main():
     n, first, last = con.execute("SELECT COUNT(*), MIN(date), MAX(date) FROM rounds").fetchone()
     shots = con.execute("SELECT COUNT(*) FROM shots").fetchone()[0]
     meta = f"{n} 場（{first} 至 {last}）・{shots} 桿擊球紀錄・產生時間 {datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))):%Y-%m-%d %H:%M}"
-    pages = [("index.html", "MI 高爾夫數據", MAIN, ["more.html", "更多分析（其餘 %d 張圖）→" % len(MORE)]),
-             ("more.html", "MI 高爾夫數據", MORE, ["index.html", "← 回主頁"]),
-             ("courses.html", "MI 高爾夫數據", [section_courses], ["index.html", "← 回主頁"]),
-             ("plan.html", "MI 高爾夫數據", [section_plan], ["index.html", "← 回主頁"])]
-    tabs = [["index.html", "主畫面"], ["courses.html", "打過的球場"], ["more.html", "更多分析"], ["plan.html", "訓練計劃"]]
+    pages = [("index.html", "MI 高爾夫數據", MAIN, None, None),
+             ("data.html", "MI 高爾夫數據", DATA, ["more.html", "更多分析（其餘 %d 張圖）→" % len(MORE)], None),
+             ("more.html", "MI 高爾夫數據", MORE, ["data.html", "← 回數據"], "data.html"),
+             ("courses.html", "MI 高爾夫數據", [section_courses], None, None),
+             ("plan.html", "MI 高爾夫數據", [section_plan], None, None)]
+    tabs = [["index.html", "場次"], ["data.html", "數據"], ["courses.html", "球場"], ["plan.html", "計劃"]]
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
-    for fname, title, sections, link in pages:
+    for fname, title, sections, link, tab in pages:
         secs = [f(con) for f in sections]
         for x in secs: x["short"] = NAV_SHORT.get(x["id"], x["title"])          # 導覽列只放簡稱，不放說明
-        report = {"meta": meta, "title": title, "link": link, "success": SUCCESS, "recent_n": RECENT_N, "sections": secs, "tabs": tabs, "page": fname, "geo": GEO if any(x["kind"] in ("roundlist", "courses") for x in secs) else {}}
+        report = {"meta": meta, "title": title, "link": link, "success": SUCCESS, "recent_n": RECENT_N, "sections": secs, "tabs": tabs, "tab": tab, "page": fname, "geo": GEO if any(x["kind"] in ("roundlist", "courses") for x in secs) else {}}
         path = os.path.join(os.path.dirname(OUT), fname)
         open(path, "w", encoding="utf-8").write(PAGE.replace("__DATA__", json.dumps(report, ensure_ascii=False)))
         print("已產生", path, "|", len(sections), "個區塊")
