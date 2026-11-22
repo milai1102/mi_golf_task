@@ -801,7 +801,7 @@ PAGE = r"""<!DOCTYPE html>
 body{margin:0;background:var(--page);color:var(--ink);font-family:-apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;line-height:1.6}
 .wrap{max-width:1040px;margin:0 auto;padding:28px 20px 60px}
 header h1{font-size:24px;font-weight:600;margin:0 0 4px}
-header p{margin:0;color:var(--ink2);font-size:14px}
+header p{margin:0;color:var(--ink2);font-size:14px}.pmeta{margin:28px 0 0;color:var(--muted);font-size:11px;text-align:center}section.solo>h2{display:none}
 nav{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 8px}
 nav a{font-size:13px;color:var(--ink2);text-decoration:none;border:1px solid var(--border);border-radius:999px;padding:4px 12px;background:var(--surface)}
 nav a:hover{color:var(--ink)}
@@ -870,7 +870,7 @@ nav{margin:10px 0 0}nav a{font-size:12px;padding:3px 10px}
 .plater{font-size:15px;color:var(--ink2);line-height:1.9;margin:0;padding-left:22px}.plan .lead+h3{margin-top:8px}
 
 .ptabs{position:sticky;top:0;z-index:30}
-.rhd{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;color:var(--ink2);margin:2px 2px 8px}.rhd b{font-size:19px;color:var(--ink)}
+.rhd{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;color:var(--ink2);margin:2px 2px 8px}.rhd b{font-size:24px;color:var(--ink)}
 .r2{display:grid;grid-template-columns:372px minmax(0,1fr);gap:20px;align-items:start}.r2 .rlist{position:sticky;top:64px;max-height:calc(100vh - 84px);overflow-y:auto;padding-right:6px}.rpane{min-width:0;border:1px solid var(--border);border-radius:14px;padding:6px 18px 16px;background:var(--surface)}
 .rmonth{font-size:12px;color:var(--muted);padding:6px 4px;position:sticky;top:0;background:var(--surface);z-index:5}
 .rcard{border:1px solid var(--border);border-radius:14px;padding:12px 14px 10px;margin-bottom:10px;background:var(--page);cursor:pointer;outline:none}.rcard:hover,.rcard:focus-visible{border-color:var(--axis)}.rcard.on{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
@@ -891,9 +891,9 @@ nav{margin:10px 0 0}nav a{font-size:12px;padding:3px 10px}
 .chart.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}.chart.scroll svg{width:var(--w);max-width:none}
 details{overflow-x:auto}
 @media (max-width:640px){
-.wrap{padding:18px 10px 48px}header h1{font-size:21px}header p{font-size:12px}
+.wrap{padding:10px 10px 48px}header h1{font-size:16px;margin:0 2px 2px}header p{font-size:12px}
 nav{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px}nav a{flex:none;white-space:nowrap}
-section{padding:14px 12px 12px;margin-top:14px;border-radius:10px}section h2{font-size:16px}
+section{padding:14px 12px 12px;margin-top:14px;border-radius:10px}section h2{font-size:16px}section.solo{background:none;border:0;padding:0;margin-top:6px}section.solo .rmonth{background:var(--page)}
 .hint{display:block}
 .cmap{height:300px}
 .filters,.sub.holes{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px}.filters .fchip,.sub.holes .fchip{flex:none}
@@ -902,10 +902,10 @@ section{padding:14px 12px 12px;margin-top:14px;border-radius:10px}section h2{fon
 .legend{gap:6px 14px}th,td{padding:4px 8px}
 }
 </style></head><body><div class="wrap">
-<header><h1 id="h1"></h1><p id="meta"></p></header><div class="ptabs" id="ptabs"></div><svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<header><h1 id="h1"></h1></header><div class="ptabs" id="ptabs"></div><svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
 <pattern id="pFw" width="14" height="14" patternUnits="userSpaceOnUse" patternTransform="rotate(40)"><rect width="14" height="14" fill="#7fc95a"/><rect width="7" height="14" fill="#8ed667"/></pattern>
 <pattern id="pTree" width="22" height="22" patternUnits="userSpaceOnUse"><rect width="22" height="22" fill="#14351b"/><circle cx="6" cy="6" r="5.2" fill="#1f5128"/><circle cx="4.8" cy="4.8" r="2.4" fill="#2c6a35"/><circle cx="17" cy="16" r="5.6" fill="#1b4723"/><circle cx="15.8" cy="14.8" r="2.6" fill="#2a6332"/><circle cx="17" cy="4" r="3.2" fill="#193f20"/><circle cx="5" cy="17" r="3.4" fill="#1d4a25"/></pattern>
-</defs></svg><nav id="nav"></nav><main id="main"></main><p class="morelink"><a id="link"></a></p></div>
+</defs></svg><nav id="nav"></nav><main id="main"></main><p class="morelink"><a id="link"></a></p><p class="pmeta" id="meta"></p></div>
 <script>
 const REPORT = __DATA__;
 const NS = "http://www.w3.org/2000/svg";
@@ -1406,7 +1406,7 @@ function render() {
   nav.style.display = REPORT.sections.length > 1 ? "" : "none";
   for (const sec of REPORT.sections) {
     if (REPORT.sections.length > 1) { const a = h("a", "", nav, sec.short || sec.title); a.href = "#" + sec.id; }
-    const s = h("section", "", main); s.id = sec.id;
+    const s = h("section", sec.kind === "roundlist" ? "solo" : "", main); s.id = sec.id;
     h("h2", "", s, sec.title);
     const host = h("div", "chart", s);
     DRAW[sec.kind](sec, host);
