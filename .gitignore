@@ -10,3 +10,8 @@ Claude outputs/
 
 # 球場每洞的地圖（Garmin 的圖，不放進公開的 repository；存在 Mac 的副本裡）
 data/course_maps/
+
+# 金鑰與密碼：只放在執行服務的那台機器上，永遠不進版控（欄位名稱見 .env.example）
+.env
+.env.*
+!.env.example
