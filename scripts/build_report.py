@@ -794,14 +794,17 @@ MORE = [section_putt_holes, section_club_recent, stacked(section_seq_cost), with
 PAGE = r"""<!DOCTYPE html>
 <html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MI 高爾夫數據</title>
+<script>try{var t=localStorage.getItem("mi-theme");if(t==="dark"||t==="light")document.documentElement.dataset.theme=t}catch(e){}</script>
 <style>
 :root{color-scheme:light;--surface:#fcfcfb;--page:#f4f3ef;--ink:#0b0b0b;--ink2:#52514e;--muted:#898781;--grid:#e1e0d9;--axis:#c3c2b7;--border:rgba(11,11,11,.10);--series:#2a78d6;--trend:#eb6834;--up:#0c8a0c;--down:#d03b3b;--putt:#1baf7a}
-@media (prefers-color-scheme:dark){:root{color-scheme:dark;--surface:#1a1a19;--page:#111110;--ink:#f0efec;--ink2:#c3c2b7;--muted:#898781;--grid:#2c2c2a;--axis:#383835;--border:rgba(255,255,255,.10);--series:#3987e5;--trend:#f08a4b;--up:#2fbf4f;--down:#f06a6a;--putt:#199e70}}
+@media (prefers-color-scheme:dark){:root:not([data-theme]){color-scheme:dark;--surface:#1a1a19;--page:#111110;--ink:#f0efec;--ink2:#c3c2b7;--muted:#898781;--grid:#2c2c2a;--axis:#383835;--border:rgba(255,255,255,.10);--series:#3987e5;--trend:#f08a4b;--up:#2fbf4f;--down:#f06a6a;--putt:#199e70}}
+:root[data-theme=dark]{color-scheme:dark;--surface:#1a1a19;--page:#111110;--ink:#f0efec;--ink2:#c3c2b7;--muted:#898781;--grid:#2c2c2a;--axis:#383835;--border:rgba(255,255,255,.10);--series:#3987e5;--trend:#f08a4b;--up:#2fbf4f;--down:#f06a6a;--putt:#199e70}
+:root[data-theme=light]{color-scheme:light}
 *{box-sizing:border-box}
 body{margin:0;background:var(--page);color:var(--ink);font-family:-apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;line-height:1.6}
 .wrap{max-width:1040px;margin:0 auto;padding:28px 20px 60px}
 header h1{font-size:24px;font-weight:600;margin:0 0 4px}
-header p{margin:0;color:var(--ink2);font-size:14px}.pmeta{margin:28px 0 0;color:var(--muted);font-size:11px;text-align:center}section.solo>h2{display:none}
+header p{margin:0;color:var(--ink2);font-size:14px}.pthm{display:flex;justify-content:center;gap:6px;margin:28px 0 0}.pthm button{font:inherit;font-size:12px;padding:5px 12px;border-radius:999px;border:1px solid var(--axis);background:none;color:var(--ink2);cursor:pointer}.pthm button.on{background:var(--ink);color:var(--page);border-color:var(--ink)}.pmeta{margin:12px 0 0;color:var(--muted);font-size:11px;text-align:center}section.solo>h2{display:none}
 nav{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 8px}
 nav a{font-size:13px;color:var(--ink2);text-decoration:none;border:1px solid var(--border);border-radius:999px;padding:4px 12px;background:var(--surface)}
 nav a:hover{color:var(--ink)}
@@ -905,7 +908,7 @@ section{padding:14px 12px 12px;margin-top:14px;border-radius:10px}section h2{fon
 <header><h1 id="h1"></h1></header><div class="ptabs" id="ptabs"></div><svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
 <pattern id="pFw" width="14" height="14" patternUnits="userSpaceOnUse" patternTransform="rotate(40)"><rect width="14" height="14" fill="#7fc95a"/><rect width="7" height="14" fill="#8ed667"/></pattern>
 <pattern id="pTree" width="22" height="22" patternUnits="userSpaceOnUse"><rect width="22" height="22" fill="#14351b"/><circle cx="6" cy="6" r="5.2" fill="#1f5128"/><circle cx="4.8" cy="4.8" r="2.4" fill="#2c6a35"/><circle cx="17" cy="16" r="5.6" fill="#1b4723"/><circle cx="15.8" cy="14.8" r="2.6" fill="#2a6332"/><circle cx="17" cy="4" r="3.2" fill="#193f20"/><circle cx="5" cy="17" r="3.4" fill="#1d4a25"/></pattern>
-</defs></svg><nav id="nav"></nav><main id="main"></main><p class="morelink"><a id="link"></a></p><p class="pmeta" id="meta"></p></div>
+</defs></svg><nav id="nav"></nav><main id="main"></main><p class="morelink"><a id="link"></a></p><div class="pthm" id="thm"></div><p class="pmeta" id="meta"></p></div>
 <script>
 const REPORT = __DATA__;
 const NS = "http://www.w3.org/2000/svg";
@@ -914,7 +917,7 @@ const h = (tag, cls, parent, text) => { const e = document.createElement(tag); i
 
 const BIN = 10;   // 色條每格 10 碼
 const OK = REPORT.success;   // 成功門檻：眾數的幾成
-const DARK = matchMedia("(prefers-color-scheme: dark)").matches;
+const THEME = document.documentElement.dataset.theme || "", DARK = THEME ? THEME === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
 const STOPS = DARK ? [[57, 135, 229], [138, 138, 132], [235, 96, 96]] : [[42, 120, 214], [226, 224, 216], [227, 73, 72]];   // 少=藍 → 中性 → 多=紅
 const heat = t => { const u = t * 2, a = STOPS[u < 1 ? 0 : 1], b = STOPS[u < 1 ? 1 : 2], f = u < 1 ? u : u - 1;
   return "rgb(" + a.map((v, i) => Math.round(v + (b[i] - v) * f)).join(",") + ")"; };
@@ -1398,6 +1401,7 @@ DRAW.plan = (sec, host) => {
 };
 
 document.getElementById("meta").textContent = REPORT.meta;
+[["", "跟著系統"], ["light", "淺色"], ["dark", "深色"]].forEach(([k, t]) => { const b = h("button", k === THEME ? "on" : "", document.getElementById("thm"), t); b.addEventListener("click", () => { try { if (k) localStorage.setItem("mi-theme", k); else localStorage.removeItem("mi-theme"); } catch (e) {} location.reload(); }); });
 document.getElementById("h1").textContent = REPORT.title; document.title = REPORT.title;
 (REPORT.tabs || []).forEach(([href, label]) => { const a = h("a", href === (REPORT.tab || REPORT.page) ? "on" : "", document.getElementById("ptabs"), label); a.href = href; });
 { const a = document.getElementById("link"); if (REPORT.link) { a.textContent = REPORT.link[1]; a.href = REPORT.link[0]; } else a.parentNode.style.display = "none"; }
