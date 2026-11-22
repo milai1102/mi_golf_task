@@ -804,7 +804,7 @@ PAGE = r"""<!DOCTYPE html>
 body{margin:0;background:var(--page);color:var(--ink);font-family:-apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;line-height:1.6}
 .wrap{max-width:1040px;margin:0 auto;padding:28px 20px 60px}
 header h1{font-size:24px;font-weight:600;margin:0 0 4px}
-header p{margin:0;color:var(--ink2);font-size:14px}.pthm{display:flex;justify-content:center;gap:6px;margin:28px 0 0}.pthm button{font:inherit;font-size:12px;padding:5px 12px;border-radius:999px;border:1px solid var(--axis);background:none;color:var(--ink2);cursor:pointer}.pthm button.on{background:var(--ink);color:var(--page);border-color:var(--ink)}.pmeta{margin:12px 0 0;color:var(--muted);font-size:11px;text-align:center}section.solo>h2{display:none}
+header p{margin:0;color:var(--ink2);font-size:14px}header{display:flex;align-items:center;justify-content:space-between;gap:10px}.pthm{display:flex;flex:none;border:1px solid var(--axis);border-radius:999px;padding:2px}.pthm button{font:inherit;font-size:12px;line-height:1;padding:5px 9px;border-radius:999px;border:0;background:none;color:var(--muted);cursor:pointer}.pthm button.on{background:var(--ink);color:var(--page)}.pmeta{margin:28px 0 0;color:var(--muted);font-size:11px;text-align:center}section.solo>h2{display:none}
 nav{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 8px}
 nav a{font-size:13px;color:var(--ink2);text-decoration:none;border:1px solid var(--border);border-radius:999px;padding:4px 12px;background:var(--surface)}
 nav a:hover{color:var(--ink)}
@@ -905,10 +905,10 @@ section{padding:14px 12px 12px;margin-top:14px;border-radius:10px}section h2{fon
 .legend{gap:6px 14px}th,td{padding:4px 8px}
 }
 </style></head><body><div class="wrap">
-<header><h1 id="h1"></h1></header><div class="ptabs" id="ptabs"></div><svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<header><h1 id="h1"></h1><div class="pthm" id="thm"></div></header><div class="ptabs" id="ptabs"></div><svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
 <pattern id="pFw" width="14" height="14" patternUnits="userSpaceOnUse" patternTransform="rotate(40)"><rect width="14" height="14" fill="#7fc95a"/><rect width="7" height="14" fill="#8ed667"/></pattern>
 <pattern id="pTree" width="22" height="22" patternUnits="userSpaceOnUse"><rect width="22" height="22" fill="#14351b"/><circle cx="6" cy="6" r="5.2" fill="#1f5128"/><circle cx="4.8" cy="4.8" r="2.4" fill="#2c6a35"/><circle cx="17" cy="16" r="5.6" fill="#1b4723"/><circle cx="15.8" cy="14.8" r="2.6" fill="#2a6332"/><circle cx="17" cy="4" r="3.2" fill="#193f20"/><circle cx="5" cy="17" r="3.4" fill="#1d4a25"/></pattern>
-</defs></svg><nav id="nav"></nav><main id="main"></main><p class="morelink"><a id="link"></a></p><div class="pthm" id="thm"></div><p class="pmeta" id="meta"></p></div>
+</defs></svg><nav id="nav"></nav><main id="main"></main><p class="morelink"><a id="link"></a></p><p class="pmeta" id="meta"></p></div>
 <script>
 const REPORT = __DATA__;
 const NS = "http://www.w3.org/2000/svg";
@@ -1401,7 +1401,7 @@ DRAW.plan = (sec, host) => {
 };
 
 document.getElementById("meta").textContent = REPORT.meta;
-[["", "跟著系統"], ["light", "淺色"], ["dark", "深色"]].forEach(([k, t]) => { const b = h("button", k === THEME ? "on" : "", document.getElementById("thm"), t); b.addEventListener("click", () => { try { if (k) localStorage.setItem("mi-theme", k); else localStorage.removeItem("mi-theme"); } catch (e) {} location.reload(); }); });
+[["", "自動"], ["light", "淺"], ["dark", "深"]].forEach(([k, t]) => { const b = h("button", k === THEME ? "on" : "", document.getElementById("thm"), t); b.addEventListener("click", () => { try { if (k) localStorage.setItem("mi-theme", k); else localStorage.removeItem("mi-theme"); } catch (e) {} location.reload(); }); });
 document.getElementById("h1").textContent = REPORT.title; document.title = REPORT.title;
 (REPORT.tabs || []).forEach(([href, label]) => { const a = h("a", href === (REPORT.tab || REPORT.page) ? "on" : "", document.getElementById("ptabs"), label); a.href = href; });
 { const a = document.getElementById("link"); if (REPORT.link) { a.textContent = REPORT.link[1]; a.href = REPORT.link[0]; } else a.parentNode.style.display = "none"; }
