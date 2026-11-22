@@ -1322,12 +1322,14 @@ DRAW.roundlist = (sec, host) => {
     r.clubs.forEach(([c, a, b, d]) => { const tr = h("tr", "", tb); h("td", "", tr, c); cell(tr, a, 1); cell(tr, b); cell(tr, d); });
     h("div", "cap", p, "常態距離（中位數，碼），括號是球數"); };
   const shotsTable = r => { const box = document.createElement("div"), tb = h("table", "rt", box), hh = h("tr", "", tb);
-    ["洞", "標準桿", "洞長", "擊球", "推桿", "桿數", "±"].forEach(x => h("th", "", hh, x));
+    ["洞", "Par", "碼", "擊球", "推", "桿", "±"].forEach(x => h("th", "", hh, x));
+    const AB = { "一號木桿": "1W", "三號木杆": "3W", "鐵木桿": "UT", "P杆": "P", "A杆": "A", "Putter": "PT" }, ab = c => AB[c] || String(c).replace(/^(\d)鐵$/, "$1i").replace(/^(\d\d)度$/, "$1°");
     r.holes.forEach(([hole, par, yd, shots, putts, est, st]) => { const tr = h("tr", "", tb);
       h("td", "", tr, hole); h("td", "", tr, par); h("td", "", tr, yd || ""); const td = h("td", "shots", tr);
-      shots.forEach(([c, dd]) => { const b = h("span", "chip", td); h("b", "", b, c); h("span", "", b, " " + dd); });
+      shots.forEach(([c, dd]) => { const b = h("span", "chip", td); h("b", "", b, ab(c)); h("span", "", b, " " + dd); b.title = c; });
       h("td", "", tr, putts == null ? "" : putts); h("td", "", tr, st);
       const dv = st - par; h("td", dv >= 3 ? "bad" : dv <= 0 ? "good" : "", tr, dv > 0 ? "+" + dv : dv === 0 ? "E" : dv); });
+    h("p", "note", box, "1W 一號木　UT 鐵木桿　6i 六鐵　P、A 是 P 杆、A 杆　PT 推桿　數字是碼");
     return box; };
   const T = sec.targets || {}, full = r => r.cat === "full";
   const FLAT = 2, F5 = sec.data.filter(full).slice(0, 5), AVG5 = F5.length ? F5.reduce((a, r) => a + r.strokes, 0) / F5.length : null;
