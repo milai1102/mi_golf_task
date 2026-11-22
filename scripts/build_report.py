@@ -698,6 +698,8 @@ def section_caddie(con):
                         if px > 15 and sh[6] > 20: ks.append(sh[6] / px)
                         if i == 0: tees.append((sh[2], sh[3]))
                 if not ks or not pin or not tees: continue
+                far = [((t[0] - pin[0]) ** 2 + (t[1] - pin[1]) ** 2) ** 0.5 for t in tees]; fm = sorted(far)[len(far) // 2]; kk = sorted(ks)[len(ks) // 2]      # 第一筆紀錄不一定是開球：只取離旗桿距離和中位數差不多的那一群
+                tees = [t for t, f in zip(tees, far) if fm - 30 / kk <= f <= fm + 40 / kk]
                 ks.sort(); tx = sorted(t[0] for t in tees); ty = sorted(t[1] for t in tees)
                 H["k"] = round(ks[len(ks) // 2], 4); H["pin"] = pin; H["tee"] = [tx[len(tx) // 2], ty[len(ty) // 2]]
                 keep.append(H)
@@ -708,6 +710,7 @@ def section_caddie(con):
     note = ("在圖上點一下，當成球現在的位置。系統算出離旗桿幾碼、判斷球位，再用你的歷史紀錄估計「用每一支桿，預期還要幾桿進洞」，建議數字最小的那一支。"
             "做法：①「還要幾桿」的表：你每一筆擊球之前的位置（離旗桿幾碼、什麼球位）→ 那一洞從這一桿起實際又用了幾桿，分組取平均並修成不遞減。"
             "② 每支桿的結果直接取你用這支桿打過的球：離旗桿在這支桿打得到的範圍內，取起點距離相近（±25%）的那些球實際的結果；超出範圍就取全揮桿的前進距離，算出落點再查表。"
+            "瞄準線：沿著球道走（球道每 40 碼取一個中心點，從發球台連到旗桿），狗腿洞的距離是沿著球道量的。沿球道的長度比直線多出 12% 以上時，當成輪廓辨識有誤，改用直線。球離這條線超過 30 碼時也改成直接指向旗桿。"
             "路線：從球的位置開始，每一桿選預期桿數最低的球桿（和第二名的差距在誤差內、而第二名的球數多三倍以上時，選球數多的那一支），照它的常態距離前進，下一桿假設在球道，直到上果嶺，再加兩推。「打得好可上果嶺」＝這支桿十球裡最遠的那一球到得了。「你從這裡平均幾桿」是第一桿的預期桿數，通常比常態路線多，因為會有打壞的球。"
             "③ 預期桿數＝1＋這些結果的平均，± 是標準誤（含查表那張表本身的誤差）。兩支桿的差距小於誤差時不能說哪一支比較好。"
             f"資料：正規球場 {m['shots']} 筆擊球；沙坑樣本少，用「比長草多 {m['bunker']} 桿」估計；果嶺上平均 {m['green']} 推。"
@@ -1372,6 +1375,15 @@ DRAW.caddie = (sec, host) => {
     const adv = rows.map(r => r.adv).sort((a, b) => a - b), end = rows.map(r => r.end).sort((a, b) => a - b);
     const tabSe = rows.reduce((a, r) => a + r.e, 0) / n; return { club, mode, n, exp: 1 + mean, se: Math.hypot(sd / Math.sqrt(n), tabSe), lo: q(adv, 0.1), med: q(adv, 0.5), hi: q(adv, 0.9), left: q(end, 0.5), green: rows.filter(r => r.g).length / n, lieAll: pool === S }; };
   const evaluate = (d, l) => M.bag.filter(c => (c !== "一號木桿" || (l === "T" && d >= 230)) && (c !== "54度" || l === "B")).map(c => evalClub(c, d, l === "W" ? "R" : l)).filter(Boolean).sort((a, b) => a.exp - b.exp);
+  const pathOf = (H, geo) => { const L = Math.hypot(H.pin[0] - H.tee[0], H.pin[1] - H.tee[1]) || 1, ux = (H.pin[0] - H.tee[0]) / L, uy = (H.pin[1] - H.tee[1]) / L, Ly = L * H.k, bins = {};
+    (geo.fairway || []).forEach(poly => { const xs = poly.map(q2 => q2[0]), ys = poly.map(q2 => q2[1]), x1 = Math.min(...xs), x2 = Math.max(...xs), y1 = Math.min(...ys), y2 = Math.max(...ys);
+      for (let x = x1; x <= x2; x += 5) for (let y = y1; y <= y2; y += 5) { const dx = x - H.tee[0], dy = y - H.tee[1], t = (dx * ux + dy * uy) * H.k, lat = (dx * uy - dy * ux) * H.k; if (t < 70 || t > Ly - 40 || Math.abs(lat) > 70 || !inside([x, y], poly)) continue; const b = Math.floor(t / 40); (bins[b] = bins[b] || []).push([x, y]); } });
+    let mid = Object.keys(bins).map(Number).sort((a, b) => a - b).filter(b => bins[b].length >= 6).map(b => [bins[b].reduce((a, q2) => a + q2[0], 0) / bins[b].length, bins[b].reduce((a, q2) => a + q2[1], 0) / bins[b].length]);
+    { const len = pp => pp.reduce((a, q2, i) => i ? a + Math.hypot(q2[0] - pp[i - 1][0], q2[1] - pp[i - 1][1]) : 0, 0); if (len([H.tee, ...mid, H.pin]) > L * 1.12) mid = []; }
+    const pts = [H.tee, ...mid, H.pin], cum = [0]; for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]) * H.k);
+    const total = cum[cum.length - 1], at = sy => { const v = Math.max(0, Math.min(total, sy)); for (let i = 1; i < pts.length; i++) if (v <= cum[i]) { const f = (v - cum[i - 1]) / (cum[i] - cum[i - 1] || 1); return [pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * f, pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * f]; } return pts[pts.length - 1]; };
+    const proj = pt => { let best = { dist: 1e9, s: 0 }; for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], b = pts[i], vx = b[0] - a[0], vy = b[1] - a[1], t = Math.max(0, Math.min(1, ((pt[0] - a[0]) * vx + (pt[1] - a[1]) * vy) / (vx * vx + vy * vy || 1))), dd = Math.hypot(pt[0] - a[0] - t * vx, pt[1] - a[1] - t * vy) * H.k; if (dd < best.dist) best = { dist: dd, s: cum[i - 1] + t * (cum[i] - cum[i - 1]) }; } return best; };
+    return { pts, cum, total, at, proj }; };
   const pick = (d, l) => { const list = evaluate(d, l); if (!list.length) return null; let b = list[0]; const s2 = list[1]; if (s2 && s2.exp - b.exp < Math.hypot(b.se, s2.se) && s2.n >= 3 * b.n) b = s2; return { b, list }; };
   const route = (d, l) => { const steps = []; let cd = d, cl = l;
     for (let n = 0; n < 6 && cd > 0 && cl !== "G"; n++) { if (cd <= 15) { steps.push({ club: "A杆", from: cd, adv: cd, left: 0, on: true, chance: false, r: (pick(cd, cl) || {}).b || { exp: 1 + M.green, se: 0, lo: 0, hi: cd, med: cd }, list: [] }); break; }
@@ -1382,19 +1394,20 @@ DRAW.caddie = (sec, host) => {
   const inside = (pt, poly) => { let ins = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [x1, y1] = poly[i], [x2, y2] = poly[j]; if ((y1 > pt[1]) !== (y2 > pt[1]) && pt[0] < (x2 - x1) * (pt[1] - y1) / (y2 - y1) + x1) ins = !ins; } return ins; };
   const cur = () => { const C = sec.data[ci], L = C.layouts[li] || C.layouts[0], H = L.holes[hi] || L.holes[0]; return { C, L, H, geo: (REPORT.geo[L.cid] || {})[H.h] || {} }; };
   const autoLie = (pt, H, geo) => { const any = k => (geo[k] || []).some(p => inside(pt, p)); if (Math.hypot(pt[0] - H.tee[0], pt[1] - H.tee[1]) * H.k < 14) return "T"; return any("green") ? "G" : any("sand") ? "B" : any("water") ? "W" : any("fairway") ? "F" : "R"; };
-  const hazards = (pt, H, geo, d) => { const ux = (H.pin[0] - pt[0]) / (d / H.k || 1), uy = (H.pin[1] - pt[1]) / (d / H.k || 1), out = [];
+  const hazards = (pt, H, geo, d, aim) => { const al = Math.hypot(aim[0] - pt[0], aim[1] - pt[1]) || 1, ux = (aim[0] - pt[0]) / al, uy = (aim[1] - pt[1]) / al, out = [];
     [["sand", "沙坑"], ["water", "水"]].forEach(([k, name]) => (geo[k] || []).forEach(poly => { const cx = poly.reduce((a, q2) => a + q2[0], 0) / poly.length, cy = poly.reduce((a, q2) => a + q2[1], 0) / poly.length, dx = cx - pt[0], dy = cy - pt[1], along = (dx * ux + dy * uy) * H.k, lat = (dx * uy - dy * ux) * H.k;
       if (along > 15 && along < d + 25 && Math.abs(lat) < 35) out.push({ name, along: Math.round(along), side: Math.abs(lat) < 8 ? "正前方" : lat > 0 ? "左" : "右" }); }));
     return out.sort((a, b) => a.along - b.along); };
   const draw = () => { const { C, L, H, geo } = cur(); selC.value = ci; selL.replaceChildren(); C.layouts.forEach((l, i) => { const o = h("option", "", selL, l.label || `區 ${i + 1}`); o.value = i; }); selL.value = li; selL.style.display = C.layouts.length > 1 ? "" : "none";
     holes.replaceChildren(); L.holes.forEach((x, i) => { const b = h("button", "fchip" + (i === hi ? " on" : ""), holes, x.h); b.addEventListener("click", () => { hi = i; pos = null; lieAuto = true; draw(); }); });
     if (!pos) { pos = H.tee.slice(); lie = "T"; }
-    const d = Math.round(Math.hypot(H.pin[0] - pos[0], H.pin[1] - pos[1]) * H.k); if (lieAuto) lie = autoLie(pos, H, geo);
+    const P = pathOf(H, geo), pj = P.proj(pos), straight = Math.hypot(H.pin[0] - pos[0], H.pin[1] - pos[1]) * H.k, onPath = pj.dist < 30 && P.total - pj.s > 20, d = Math.round(onPath ? pj.dist + P.total - pj.s : straight); if (lieAuto) lie = autoLie(pos, H, geo);
     const pts = []; (geo.outline || []).forEach(p => pts.push(...p)); pts.push(H.tee, H.pin); const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]), pad = 14, x0 = Math.min(...xs) - pad, y0 = Math.min(...ys) - pad, w = Math.max(...xs) - x0 + pad, hh = Math.max(...ys) - y0 + pad, k = Math.max(w, hh) / 330;
     mapBox.replaceChildren(); const svg = el("svg", { viewBox: `${x0} ${y0} ${w} ${hh}`, style: `height:${NARROW() ? 430 : 600}px`, preserveAspectRatio: "xMidYMid meet" }, mapBox); el("rect", { x: x0, y: y0, width: w, height: hh, fill: "#0c0c0b" }, svg); drawCourse(svg, geo);
     const steps = lie === "G" ? [] : route(d, lie), first = steps[0], best = first && first.r;
-    if (d > 0) { const ux = (H.pin[0] - pos[0]) / (d / H.k), uy = (H.pin[1] - pos[1]) / (d / H.k), at = yd => [pos[0] + ux * yd / H.k, pos[1] + uy * yd / H.k];
-      el("line", { x1: pos[0], y1: pos[1], x2: H.pin[0], y2: H.pin[1], stroke: "#fff", "stroke-width": 1.2 * k, "stroke-dasharray": `${4 * k} ${4 * k}`, "stroke-opacity": 0.8 }, svg);
+    const sux = (H.pin[0] - pos[0]) / (straight / H.k || 1), suy = (H.pin[1] - pos[1]) / (straight / H.k || 1), at = yd => onPath ? P.at(pj.s + Math.max(0, yd - pj.dist)) : [pos[0] + sux * yd / H.k, pos[1] + suy * yd / H.k];
+    if (d > 0) { const line = onPath ? [pos, ...Array.from({ length: 41 }, (_, i) => P.at(pj.s + (P.total - pj.s) * i / 40))] : [pos, H.pin];
+      el("polyline", { points: line.map(q2 => q2.map(v => v.toFixed(1)).join(",")).join(" "), fill: "none", stroke: "#fff", "stroke-width": 1.2 * k, "stroke-dasharray": `${4 * k} ${4 * k}`, "stroke-opacity": 0.8 }, svg);
       if (best && !first.on) { const a = at(Math.min(best.lo, d)), b = at(Math.min(best.hi, d)); el("line", { x1: a[0], y1: a[1], x2: b[0], y2: b[1], stroke: "#ffd23f", "stroke-width": 9 * k, "stroke-opacity": 0.4, "stroke-linecap": "round" }, svg); }
       let cum = 0; steps.forEach((st, n) => { if (st.on) return; cum += st.adv; const m = at(cum); el("circle", { cx: m[0], cy: m[1], r: 7 * k, fill: "#ffd23f", stroke: "#111", "stroke-width": k }, svg); el("text", { x: m[0], y: m[1] + 3.6 * k, "text-anchor": "middle", "font-size": 10 * k, "font-weight": 700, fill: "#111" }, svg, n + 1); }); }
     { const [px, py] = H.pin; el("line", { x1: px, y1: py, x2: px, y2: py - 16 * k, stroke: "#fff", "stroke-width": 1.5 * k }, svg); el("polygon", { points: `${px},${py - 16 * k} ${px + 9 * k},${py - 12.5 * k} ${px},${py - 9 * k}`, fill: "#ff3b3b" }, svg); }
@@ -1413,7 +1426,7 @@ DRAW.caddie = (sec, host) => {
     const grid = h("div", "cad-steps", res); steps.forEach((st, n) => { h("i", "", grid, n + 1); h("b", "", grid, st.club); h("span", "", grid, st.on ? "上果嶺" : `${st.adv} 碼`); h("span", "rem", grid, st.on ? "" : `剩 ${st.left}` + (st.chance ? "・打得好可上果嶺" : "")); });
     h("i", "pt", grid, "推"); h("b", "", grid, "推桿"); h("span", "", grid, "兩推"); h("span", "rem", grid, "");
     h("div", "ln", res).innerHTML = (used === 0 ? `照常態打 <b>${total}</b> 桿（<b>${nm}</b>）` : `照常態打再 <b>${total}</b> 桿`) + `・你從這裡平均 <b>${best.exp.toFixed(1)}</b> 桿`;
-    const hz = hazards(pos, H, geo, d); if (hz.length) h("div", "ln", res).innerHTML = "前方：" + hz.slice(0, 3).map(z => `${z.name} <b>${z.along}</b> 碼${z.side}` + (!first.on && z.along >= best.lo - 5 && z.along <= best.hi + 5 ? "（這一桿會到）" : "")).join("、");
+    const hz = hazards(pos, H, geo, d, first.on ? H.pin : at(best.med)); if (hz.length) h("div", "ln", res).innerHTML = "前方：" + hz.slice(0, 3).map(z => `${z.name} <b>${z.along}</b> 碼${z.side}` + (!first.on && z.along >= best.lo - 5 && z.along <= best.hi + 5 ? "（這一桿會到）" : "")).join("、");
     const list = first.list; if (list.length > 1) { const det = h("details", "cad-det", res); h("summary", "", det, "這一桿各球桿的比較"); const t = h("table", "cad-t", det), hr = h("tr", "", t); ["球桿", "常態前進", "打完剩", "預期桿數", "球數"].forEach(x => h("th", "", hr, x));
       list.slice(0, 4).forEach(r => { const tr = h("tr", r === best ? "on" : "", t); h("td", "", tr, r.club); h("td", "", tr, `${r.med}（${r.lo}–${r.hi}）`); h("td", "", tr, r.left); h("td", "", tr, `${r.exp.toFixed(1)} ±${r.se.toFixed(1)}`); h("td", "", tr, r.n); }); } };
   { const a2 = h("a", "cad-doc", side, "AI 桿弟的設計文件 →"); a2.href = "https://github.com/milai1102/mi_golf_task/blob/main/docs/ai_caddie.md"; a2.target = "_blank"; a2.rel = "noopener"; }
