@@ -1337,7 +1337,7 @@ DRAW.roundlist = (sec, host) => {
     const top = h("div", "rc1", c), L = h("div", "rttl", top); h("span", "rdate", L, (r.date.slice(0, 4) !== String(new Date().getFullYear()) ? r.date.slice(2, 4) + "/" : "") + r.date.slice(5).replace("-", "/")); h("span", "rname", L, r.short);
     [r.tag, r.n !== 18 ? r.n + " 洞" : ""].filter(Boolean).forEach(x => h("span", "rsub", L, x));
     const stat = (box, k, v, ok, ic) => { const d = h("div", "", box); if (ic) h("i", ic, d); h("span", "", d, k + " "); h("b", ok ? "ok" : "", d, v == null ? "—" : v); };
-    const s2 = h("div", "rstk", top); stat(s2, "推桿", r.putts, full(r) && r.putts != null && r.putts <= T.putts); h("div", "", s2, (r.over > 0 ? "+" : "") + r.over);
+    const s2 = h("div", "rstk", top); stat(s2, "推桿", r.putts, full(r) && r.putts != null && r.putts <= T.putts);
     const R = h("div", "rtot", top); h("b", full(r) && T.score && r.strokes <= T.score ? "ok" : "", R, r.strokes);
     h("i", full(r) && AVG5 != null && r.strokes !== AVG5 ? (r.strokes < AVG5 ? "dn" : "up") : "", R, full(r) && AVG5 != null && r.strokes !== AVG5 ? (r.strokes < AVG5 ? "▼" : "▲") : "");
     const bars = h("div", "rbars", c), dots = h("div", "rdots", c);
