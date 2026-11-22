@@ -18,3 +18,7 @@
 `data/raw` → `data/rounds`（核心）→ `data/processed/golf.db` → `reports`
 
 完整工作邏輯見 `CLAUDE.md`。
+
+## AI 桿弟
+
+依歷史紀錄建議每一洞怎麼打的實驗功能。設計文件：[docs/ai_caddie.md](docs/ai_caddie.md)；模擬器：<https://milai1102.github.io/mi_golf_task/reports/caddie.html>。
