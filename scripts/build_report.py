@@ -875,12 +875,12 @@ nav{margin:10px 0 0}nav a{font-size:12px;padding:3px 10px}
 .rmonth{font-size:12px;color:var(--muted);padding:6px 4px;position:sticky;top:0;background:var(--surface);z-index:5}
 .rcard{border:1px solid var(--border);border-radius:14px;padding:12px 14px 10px;margin-bottom:10px;background:var(--page);cursor:pointer;outline:none}.rcard:hover,.rcard:focus-visible{border-color:var(--axis)}.rcard.on{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
 .rc1{display:flex;justify-content:space-between;align-items:center;gap:10px}.rttl{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px;min-width:0}.rdate{font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums}.rname{font-size:19px;font-weight:700;line-height:1.25}.rsub{font-size:12px;color:var(--muted)}
-.rtot{white-space:nowrap;line-height:1}.rtot b{font-size:36px;font-weight:700;font-variant-numeric:tabular-nums}.rtot span{font-size:13px;color:var(--muted);margin-left:6px}
+.rtot{white-space:nowrap;line-height:1}.rtot b{font-size:36px;font-weight:700;font-variant-numeric:tabular-nums}.rttl{flex:1}.rstk{flex:none;font-size:12px;color:var(--muted);line-height:1.45;white-space:nowrap;font-variant-numeric:tabular-nums}.rstk b{font-size:15px;color:var(--ink)}.rstk:last-child{min-width:54px}
 .rc2{display:flex;gap:18px;margin-top:2px;font-size:13px;color:var(--muted)}.rc2 b{font-size:16px;color:var(--ink);font-variant-numeric:tabular-nums}.rcard b.ok{color:var(--up)}
 .rbars{display:flex;gap:3px;align-items:flex-end;height:46px;padding-bottom:8px;margin-top:6px;box-sizing:border-box}.rbars i,.rdots i{flex:1;display:block;min-width:0}.rbars i.gap,.rdots i.gap{margin-left:9px}
 .rbars i{border-radius:2px 2px 0 0}.rbars i.p,.rlg i.p{background:var(--up);height:4px}.rbars i.g,.rlg i.g{background:var(--muted)}.rbars i.d,.rlg i.d{background:#ef9f27}.rbars i.x,.rlg i.x{background:var(--down)}.rbars i.b{background:var(--series);height:8px;margin-bottom:-8px;border-radius:0 0 2px 2px}.rlg i.b{background:var(--series)}
 .rdots{display:flex;gap:3px;height:6px;margin-top:3px}.rdots i.d::after{content:"";display:block;width:6px;height:6px;border-radius:50%;background:var(--down);margin:0 auto}
-.rsum{display:flex;gap:9px;margin-top:5px;font-size:12px;color:var(--muted)}.rsum b{font-size:14px;color:var(--ink)}.rsum span:last-child:not(:first-child){text-align:right}
+.rsum{display:flex;align-items:baseline;margin-top:6px;font-size:12px;color:var(--muted)}.rsum b{font-size:15px;color:var(--ink);font-variant-numeric:tabular-nums}.rsum .rs{flex:1;white-space:nowrap}.rsum .rs:last-child{text-align:right}.rsum .mid{display:flex;gap:14px;white-space:nowrap}.rsum .mid i{display:inline-block;margin-right:4px;background:var(--down)}.rsum i.dot{width:7px;height:7px;border-radius:50%}.rsum i.sq{width:7px;height:10px;border-radius:1.5px 1.5px 0 0;vertical-align:-1px}
 .rlg{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--muted);margin:10px 2px 0}.rlg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}.rlg i.dot{width:7px;height:7px;border-radius:50%;background:var(--down)}
 .maps figcaption{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rdet{margin:-4px 0 14px;padding:0 2px 8px;border-bottom:1px solid var(--grid)}.rdh{position:sticky;top:0;z-index:8;display:flex;justify-content:space-between;align-items:center;background:var(--surface);padding:8px 2px;border-bottom:1px solid var(--grid);font-size:14px;cursor:pointer}.rdh span{font-size:12px;color:var(--muted)}
@@ -1335,12 +1335,15 @@ DRAW.roundlist = (sec, host) => {
   const cardEl = r => { const c = document.createElement("div"); c.className = "rcard"; c.tabIndex = 0;
     const top = h("div", "rc1", c), L = h("div", "rttl", top); h("span", "rdate", L, (r.date.slice(0, 4) !== String(new Date().getFullYear()) ? r.date.slice(2, 4) + "/" : "") + r.date.slice(5).replace("-", "/")); h("span", "rname", L, r.short);
     [r.tag, r.n !== 18 ? r.n + " 洞" : ""].filter(Boolean).forEach(x => h("span", "rsub", L, x));
-    const R = h("div", "rtot", top); h("b", full(r) && T.score && r.strokes <= T.score ? "ok" : "", R, r.strokes); h("span", "", R, (r.over > 0 ? "+" : "") + r.over);
-    const st = h("div", "rc2", c), stat = (k, v, ok) => { const d = h("div", "", st); h("span", "", d, k + " "); h("b", ok ? "ok" : "", d, v == null ? "—" : v); };
-    stat("推桿", r.putts, full(r) && r.putts != null && r.putts <= T.putts); stat("三推", r.putts == null ? null : threeOf(r), full(r) && threeOf(r) <= T.three); stat("爆桿", blowOf(r), full(r) && blowOf(r) <= T.blow);
+    const stat = (box, k, v, ok, ic) => { const d = h("div", "", box); if (ic) h("i", ic, d); h("span", "", d, k + " "); h("b", ok ? "ok" : "", d, v == null ? "—" : v); };
+    const R = h("div", "rtot", top); h("b", full(r) && T.score && r.strokes <= T.score ? "ok" : "", R, r.strokes);
+    const s2 = h("div", "rstk", top); stat(s2, "推桿", r.putts, full(r) && r.putts != null && r.putts <= T.putts); h("div", "", s2, (r.over > 0 ? "+" : "") + r.over);
     const bars = h("div", "rbars", c), dots = h("div", "rdots", c);
     r.holes.forEach((x, i) => { const g = i && i % 9 === 0 ? " gap" : "", dv = x[6] - x[1], b = h("i", lvl(dv) + g, bars); if (dv > 0) b.style.height = Math.min(4 + dv * 10, 36) + "px"; h("i", (x[4] >= 3 ? "d" : "") + g, dots); });
-    if (r.holes.length > 9) { const ft = h("div", "rsum", c); for (let i = 0; i < r.holes.length; i += 9) { const part = r.holes.slice(i, i + 9), sp = h("span", "", ft, (r.parts && r.parts[i] ? r.parts[i] : i === 0 ? "前九" : i === 9 ? "後九" : "") + " "); sp.style.flex = part.length; h("b", "", sp, part.reduce((a, x) => a + x[6], 0)); } }
+    const ft = h("div", "rsum", c), two = r.holes.length > 9 && r.holes.length <= 18, sub = i => { const part = r.holes.slice(i, i + 9), sp = h("span", "rs", ft, (r.parts && r.parts[i] ? r.parts[i] : i === 0 ? "前九" : "後九") + " "); h("b", "", sp, part.reduce((a, x) => a + x[6], 0)); };
+    if (two) sub(0); else h("span", "rs", ft);
+    const mid = h("span", "mid", ft); stat(mid, "三推", r.putts == null ? null : threeOf(r), full(r) && r.putts != null && threeOf(r) <= T.three, "dot"); stat(mid, "爆桿", blowOf(r), full(r) && blowOf(r) <= T.blow, "sq");
+    if (two) sub(9); else h("span", "rs", ft);
     return c; };
   const WIDE = innerWidth >= 900; let sel = null;
   const head = h("div", "rhd", host), bar2 = h("div", "filters", host), wrap = h("div", WIDE ? "r2" : "r1", host), list = h("div", "rlist", wrap), pane = WIDE ? h("div", "rpane", wrap) : null;
