@@ -650,13 +650,46 @@ def caddie_model(con, before=None):
         out[club] = {"reach": full[int(len(full) * 0.75)], "med": full[len(full) // 2], "n": len(v), "s": v}
     return {"E": E, "bunker": bunker_extra, "green": round(putts, 2), "clubs": out, "bag": [c for c in CADDIE_BAG if c in out], "shots": len(rows)}
 
+def caddie_geofit():
+    """每一洞「經緯度 → 球洞圖像素」的仿射轉換，用 data/raw/gps 裡每一桿的起點、落點和旗桿（同時有經緯度和像素座標）做最小平方法。
+    回傳 {(球場代碼, 洞號): [lat0, lon0, a, b, c, d, e, f]}：x = a·Δlon + b·Δlat + c，y = d·Δlon + e·Δlat + f（Δ 是減掉 lat0、lon0 之後的度數）。"""
+    import glob
+    import numpy as np
+    pts = {}
+    for path in sorted(glob.glob(os.path.join(ROOT, "data/raw/gps", "*.txt"))):
+        cid = None; key = None
+        for line in open(path, encoding="utf-8"):
+            c = line.rstrip("\n").split("|")
+            if c[0] == "C": cid = c[1]
+            elif c[0].startswith("H"):
+                hc, hn = cid, int(c[0][1:]); mp = c[3].split("/") if len(c) > 3 and c[3] else []
+                if len(mp) >= 2 and mp[0].startswith("gid") and mp[1].startswith("hole"): hc, hn = mp[0][3:], int(mp[1][4:])
+                key = (hc, hn); q = c[2].split(",")
+                if len(q) > 3 and q[0] and q[2]: pts.setdefault(key, []).append((int(q[0]), int(q[1]), int(q[2]), int(q[3])))
+            elif c[0] and key:
+                for part in (c[4], c[5]):
+                    q = part.split(",")
+                    if len(q) > 3 and q[0] and q[2]: pts.setdefault(key, []).append((int(q[0]), int(q[1]), int(q[2]), int(q[3])))
+    out = {}; K = 180 / 2 ** 31
+    for key, v in pts.items():
+        v = list(set(v))
+        if len(v) < 4: continue
+        lat = np.array([p[0] * K for p in v]); lon = np.array([p[1] * K for p in v]); lat0, lon0 = float(lat.mean()), float(lon.mean())
+        A = np.column_stack([lon - lon0, lat - lat0, np.ones(len(v))])
+        cx, *_ = np.linalg.lstsq(A, np.array([p[2] for p in v], float), rcond=None); cy, *_ = np.linalg.lstsq(A, np.array([p[3] for p in v], float), rcond=None)
+        err = float(np.max(np.hypot(A @ cx - [p[2] for p in v], A @ cy - [p[3] for p in v])))
+        if err > 12: continue                                                      # 點太少或共線，轉換不可靠
+        out[key] = [round(lat0, 7), round(lon0, 7)] + [round(float(x), 3) for x in list(cx) + list(cy)]
+    return out
+
 def section_caddie(con):
     """AI 桿弟的模擬器：在球洞圖上點一個位置，依歷史紀錄建議球桿與距離。"""
-    courses = section_courses(con)["data"]
+    courses = section_courses(con)["data"]; fit = caddie_geofit()
     for c in courses:
         for L in c["layouts"]:
             keep = []
             for H in L["holes"]:
+                if (L["cid"], H["h"]) in fit: H["ll"] = fit[(L["cid"], H["h"])]
                 ks, tees, pin = [], [], None
                 for p in H["plays"]:
                     if p["pin"]: pin = p["pin"]
@@ -678,7 +711,7 @@ def section_caddie(con):
             "路線：從球的位置開始，每一桿選預期桿數最低的球桿（和第二名的差距在誤差內、而第二名的球數多三倍以上時，選球數多的那一支），照它的常態距離前進，下一桿假設在球道，直到上果嶺，再加兩推。「打得好可上果嶺」＝這支桿十球裡最遠的那一球到得了。「你從這裡平均幾桿」是第一桿的預期桿數，通常比常態路線多，因為會有打壞的球。"
             "③ 預期桿數＝1＋這些結果的平均，± 是標準誤（含查表那張表本身的誤差）。兩支桿的差距小於誤差時不能說哪一支比較好。"
             f"資料：正規球場 {m['shots']} 筆擊球；沙坑樣本少，用「比長草多 {m['bunker']} 桿」估計；果嶺上平均 {m['green']} 推。"
-            "限制：沒有考慮風、高低差、障礙物的罰桿，也沒有考慮左右偏差；旗桿位置是你上次打的那天的。球場輪廓是依 Garmin 地圖重新描的示意圖，球位判斷可能有誤，可以手動改。")
+            "「我在這裡，怎麼打？」用手機的定位找出你在哪個球場、哪一洞、圖上的哪個位置（每一洞的經緯度和圖上座標的對應，是用你歷次擊球的座標算出來的），再唸出同一句話；位置只在你的瀏覽器裡計算，不會傳到任何地方。限制：沒有考慮風、高低差、障礙物的罰桿，也沒有考慮左右偏差；旗桿位置是你上次打的那天的。球場輪廓是依 Garmin 地圖重新描的示意圖，球位判斷可能有誤，可以手動改。")
     return {"id": "caddie", "title": "AI 桿弟（模擬器）", "note": note, "kind": "caddie", "data": courses, "model": m, "table": {"head": [], "rows": []}}
 
 PLAN_START = "2026-11-16"          # 計劃定案的日期，這一天之後的場次才算「計劃開始後」
@@ -890,7 +923,7 @@ PAGE = r"""<!DOCTYPE html>
 body{margin:0;background:var(--page);color:var(--ink);font-family:-apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;line-height:1.6}
 .wrap{max-width:1040px;margin:0 auto;padding:28px 20px 60px}
 header h1{font-size:24px;font-weight:600;margin:0 0 4px}
-header p{margin:0;color:var(--ink2);font-size:14px}header{display:flex;align-items:center;justify-content:space-between;gap:10px}.pthm{display:flex;flex:none;border:1px solid var(--axis);border-radius:999px;padding:2px}.pthm button{font:inherit;font-size:12px;line-height:1;padding:5px 9px;border-radius:999px;border:0;background:none;color:var(--muted);cursor:pointer}.pthm button.on{background:var(--ink);color:var(--page)}.cad-top{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 8px}.cad-top select{font:inherit;font-size:15px;padding:7px 10px;border-radius:8px;border:1px solid var(--axis);background:var(--surface);color:var(--ink);max-width:100%}.cad-holes{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;-webkit-overflow-scrolling:touch}.cad-holes .fchip{flex:none;min-width:40px;text-align:center}.cad-map{background:#0c0c0b;border-radius:10px;padding:6px;touch-action:manipulation}.cad-map svg{display:block;width:100%;cursor:crosshair}.cad-cap{font-size:12px;color:#c3c2b7;text-align:center;padding:6px 0 2px}.cad-side .filters{margin:10px 0 0}.cad-res{border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:14px;margin-top:10px}.cad-res .big{font-size:28px;font-weight:700;margin:2px 0 4px}.cad-res .ln{font-size:14px;color:var(--ink2);margin-top:4px;line-height:1.5}.cad-res .ln b{color:var(--ink);font-variant-numeric:tabular-nums}.cad-say{font-size:18px;font-weight:600;line-height:1.55;margin:6px 0 12px}.cad-steps{display:grid;grid-template-columns:22px max-content max-content minmax(0,1fr);gap:8px 12px;align-items:center;font-size:15px;margin:4px 0 10px}.cad-steps i{font-style:normal;width:22px;height:22px;border-radius:50%;background:#ffd23f;color:#111;font-size:12px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}.cad-steps i.pt{background:var(--grid);color:var(--ink2)}.cad-steps span{font-variant-numeric:tabular-nums}.cad-steps .rem{color:var(--ink2);font-size:13px;min-width:0}.cad-det{margin-top:10px}.cad-doc{display:block;margin:14px 2px 0;font-size:13px;color:var(--ink2)}.cad-det summary{font-size:13px;color:var(--ink2);cursor:pointer}.cad-res .ln.warn{color:var(--trend)}table.cad-t{width:100%;border-collapse:collapse;margin-top:12px;font-size:13px;font-variant-numeric:tabular-nums}table.cad-t th{font-weight:400;color:var(--muted);text-align:right;padding:4px 4px;border-bottom:1px solid var(--axis)}table.cad-t td{text-align:right;padding:6px 4px;border-bottom:1px solid var(--grid)}table.cad-t th:first-child,table.cad-t td:first-child{text-align:left}table.cad-t tr.on td{font-weight:600}@media(min-width:900px){.cad-wrap{display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:20px;align-items:start}}.pmeta{margin:28px 0 0;color:var(--muted);font-size:11px;text-align:center}section.solo>h2{display:none}
+header p{margin:0;color:var(--ink2);font-size:14px}header{display:flex;align-items:center;justify-content:space-between;gap:10px}.pthm{display:flex;flex:none;border:1px solid var(--axis);border-radius:999px;padding:2px}.pthm button{font:inherit;font-size:12px;line-height:1;padding:5px 9px;border-radius:999px;border:0;background:none;color:var(--muted);cursor:pointer}.pthm button.on{background:var(--ink);color:var(--page)}.cad-gps{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:4px 0 10px}.cad-here{font:inherit;font-size:17px;font-weight:700;padding:13px 20px;border-radius:12px;border:0;background:var(--ink);color:var(--page);cursor:pointer;flex:1 1 220px}.cad-msg{font-size:13px;color:var(--ink2)}.cad-top{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 8px}.cad-top select{font:inherit;font-size:15px;padding:7px 10px;border-radius:8px;border:1px solid var(--axis);background:var(--surface);color:var(--ink);max-width:100%}.cad-holes{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;-webkit-overflow-scrolling:touch}.cad-holes .fchip{flex:none;min-width:40px;text-align:center}.cad-map{background:#0c0c0b;border-radius:10px;padding:6px;touch-action:manipulation}.cad-map svg{display:block;width:100%;cursor:crosshair}.cad-cap{font-size:12px;color:#c3c2b7;text-align:center;padding:6px 0 2px}.cad-side .filters{margin:10px 0 0}.cad-res{border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:14px;margin-top:10px}.cad-res .big{font-size:28px;font-weight:700;margin:2px 0 4px}.cad-res .ln{font-size:14px;color:var(--ink2);margin-top:4px;line-height:1.5}.cad-res .ln b{color:var(--ink);font-variant-numeric:tabular-nums}.cad-say{font-size:18px;font-weight:600;line-height:1.55;margin:6px 0 12px}.cad-steps{display:grid;grid-template-columns:22px max-content max-content minmax(0,1fr);gap:8px 12px;align-items:center;font-size:15px;margin:4px 0 10px}.cad-steps i{font-style:normal;width:22px;height:22px;border-radius:50%;background:#ffd23f;color:#111;font-size:12px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}.cad-steps i.pt{background:var(--grid);color:var(--ink2)}.cad-steps span{font-variant-numeric:tabular-nums}.cad-steps .rem{color:var(--ink2);font-size:13px;min-width:0}.cad-det{margin-top:10px}.cad-doc{display:block;margin:14px 2px 0;font-size:13px;color:var(--ink2)}.cad-det summary{font-size:13px;color:var(--ink2);cursor:pointer}.cad-res .ln.warn{color:var(--trend)}table.cad-t{width:100%;border-collapse:collapse;margin-top:12px;font-size:13px;font-variant-numeric:tabular-nums}table.cad-t th{font-weight:400;color:var(--muted);text-align:right;padding:4px 4px;border-bottom:1px solid var(--axis)}table.cad-t td{text-align:right;padding:6px 4px;border-bottom:1px solid var(--grid)}table.cad-t th:first-child,table.cad-t td:first-child{text-align:left}table.cad-t tr.on td{font-weight:600}@media(min-width:900px){.cad-wrap{display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:20px;align-items:start}}.pmeta{margin:28px 0 0;color:var(--muted);font-size:11px;text-align:center}section.solo>h2{display:none}
 nav{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 8px}
 nav a{font-size:13px;color:var(--ink2);text-decoration:none;border:1px solid var(--border);border-radius:999px;padding:4px 12px;background:var(--surface)}
 nav a:hover{color:var(--ink)}
@@ -1316,6 +1349,14 @@ DRAW.courses = (sec, host) => {
 DRAW.caddie = (sec, host) => {
   const M = sec.model, LIEZH = { T: "發球台", F: "球道", R: "長草", B: "沙坑", G: "果嶺", W: "水" };
   let ci = 0, li = 0, hi = 0, pos = null, lie = "T", lieAuto = true;
+  const gpsRow = h("div", "cad-gps", host), gpsBtn = h("button", "cad-here", gpsRow, "我在這裡，怎麼打？"), gpsMsg = h("span", "cad-msg", gpsRow); let lastSay = "";
+  const toPx = (H, lat, lon) => { const g = H.ll, dx = lon - g[1], dy = lat - g[0]; return [g[2] * dx + g[3] * dy + g[4], g[5] * dx + g[6] * dy + g[7]]; };
+  const segDist = (p, a, b) => { const vx = b[0] - a[0], vy = b[1] - a[1], t = Math.max(0, Math.min(1, ((p[0] - a[0]) * vx + (p[1] - a[1]) * vy) / (vx * vx + vy * vy || 1))); return Math.hypot(p[0] - a[0] - t * vx, p[1] - a[1] - t * vy); };
+  const locate = (lat, lon) => { let bestH = null; sec.data.forEach((c, i) => { if (!c.ll || Math.abs(c.ll[0] - lat) > 0.05 || Math.abs(c.ll[1] - lon) > 0.05) return; c.layouts.forEach((L, j) => L.holes.forEach((H, n) => { if (!H.ll) return; const p = toPx(H, lat, lon), dd = segDist(p, H.tee, H.pin) * H.k; if (!bestH || dd < bestH.dd) bestH = { dd, i, j, n, p }; })); }); return bestH; };
+  const speak = t => { try { if (!("speechSynthesis" in window)) return; speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t.replace(/杆/g, "桿")); u.lang = "zh-TW"; speechSynthesis.speak(u); } catch (e) {} };
+  const here = (lat, lon, acc) => { const b = locate(lat, lon); if (!b || b.dd > 120) { gpsMsg.textContent = "不在打過的球場上"; return; } ci = b.i; li = b.j; hi = b.n; pos = [Math.round(b.p[0]), Math.round(b.p[1])]; lieAuto = true; draw(); gpsMsg.textContent = acc ? `定位誤差約 ${Math.round(acc * 1.09361)} 碼` : ""; speak(lastSay); lieRow.scrollIntoView({ behavior: "smooth", block: "start" }); };
+  gpsBtn.addEventListener("click", () => { if (!navigator.geolocation) { gpsMsg.textContent = "這個瀏覽器不支援定位"; return; } gpsMsg.textContent = "定位中…"; try { if ("speechSynthesis" in window) speechSynthesis.speak(new SpeechSynthesisUtterance("")); } catch (e) {}
+    navigator.geolocation.getCurrentPosition(g => here(g.coords.latitude, g.coords.longitude, g.coords.accuracy), e => { gpsMsg.textContent = e.code === 1 ? "沒有定位權限" : "定位失敗"; }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }); });
   const top = h("div", "cad-top", host), selC = h("select", "", top), selL = h("select", "", top), holes = h("div", "cad-holes", host), wrap = h("div", "cad-wrap", host), mapBox = h("div", "cad-map", wrap), side = h("div", "cad-side", wrap), lieRow = h("div", "filters", side), res = h("div", "cad-res", side);
   sec.data.forEach((c, i) => { const o = h("option", "", selC, `${c.short}（${c.n} 場）`); o.value = i; });
   const interp = (tab, d) => { if (d <= tab[0][0]) return tab[0][1]; const n = tab.length; if (d >= tab[n - 1][0]) return tab[n - 1][1]; for (let i = 1; i < n; i++) if (d <= tab[i][0]) { const a = tab[i - 1], b = tab[i]; return a[1] + (b[1] - a[1]) * (d - a[0]) / (b[0] - a[0]); } return tab[n - 1][1]; };
@@ -1363,11 +1404,12 @@ DRAW.caddie = (sec, host) => {
     lieRow.replaceChildren(); [["T", "發球台"], ["F", "球道"], ["R", "長草"], ["B", "沙坑"], ["G", "果嶺"]].forEach(([c, t]) => { const b = h("button", "fchip" + ((lie === "W" ? "R" : lie) === c ? " on" : ""), lieRow, t); b.addEventListener("click", () => { lie = c; lieAuto = false; draw(); }); });
     { const b = h("button", "fchip", lieRow, "回發球台"); b.addEventListener("click", () => { pos = null; lieAuto = true; draw(); }); }
     res.replaceChildren(); h("div", "ln", res, `離旗桿 ${d} 碼・${LIEZH[lie]}` + (lie === "W" ? "（照長草算，另加罰桿）" : ""));
-    if (lie === "G") { h("div", "cad-say", res, "在果嶺上，兩推。"); h("div", "ln", res).innerHTML = `果嶺上平均 <b>${M.green.toFixed(2)}</b> 推`; return; }
+    lastSay = "";
+    if (lie === "G") { lastSay = "在果嶺上，兩推。"; h("div", "cad-say", res, "在果嶺上，兩推。"); h("div", "ln", res).innerHTML = `果嶺上平均 <b>${M.green.toFixed(2)}</b> 推`; return; }
     if (!steps.length) { h("div", "cad-say", res, "資料不足"); return; }
     const used = (pos[0] === H.tee[0] && pos[1] === H.tee[1]) ? 0 : null, total = steps.length + 2, dv = used === 0 ? total - H.par : null, nm = dv == null ? "" : dv <= -1 ? "Birdie" : dv === 0 ? "Par" : dv === 1 ? "Bogey" : dv === 2 ? "Double" : "+" + dv;
     const parts = []; let prevChance = false; steps.forEach((st, n) => { const act = st.on ? (st.from <= 80 ? "切上果嶺" : "上果嶺") : ` ${st.adv} 碼`; parts.push((prevChance ? "不順利再用 " : n ? "接 " : "") + st.club + (st.on && prevChance ? " 切上去" : act) + (st.chance ? "，順利的話直接上果嶺" : "")); prevChance = st.chance; });
-    h("div", "cad-say", res, `${d} 碼。${parts.join("，")}，兩推` + (used === 0 ? `，${total} 桿 ${nm}。` : `，再 ${total} 桿進洞。`));
+    lastSay = `${d} 碼。${parts.join("，")}，兩推` + (used === 0 ? `，${total} 桿 ${nm}。` : `，再 ${total} 桿進洞。`); h("div", "cad-say", res, lastSay);
     const grid = h("div", "cad-steps", res); steps.forEach((st, n) => { h("i", "", grid, n + 1); h("b", "", grid, st.club); h("span", "", grid, st.on ? "上果嶺" : `${st.adv} 碼`); h("span", "rem", grid, st.on ? "" : `剩 ${st.left}` + (st.chance ? "・打得好可上果嶺" : "")); });
     h("i", "pt", grid, "推"); h("b", "", grid, "推桿"); h("span", "", grid, "兩推"); h("span", "rem", grid, "");
     h("div", "ln", res).innerHTML = (used === 0 ? `照常態打 <b>${total}</b> 桿（<b>${nm}</b>）` : `照常態打再 <b>${total}</b> 桿`) + `・你從這裡平均 <b>${best.exp.toFixed(1)}</b> 桿`;
