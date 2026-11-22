@@ -1334,7 +1334,7 @@ DRAW.roundlist = (sec, host) => {
   const lvl = dv => dv <= -1 ? "b" : dv === 0 ? "p" : dv === 1 ? "g" : dv === 2 ? "d" : "x";
   const cardEl = r => { const c = document.createElement("div"); c.className = "rcard"; c.tabIndex = 0;
     const top = h("div", "rc1", c), L = h("div", "rttl", top); h("span", "rdate", L, (r.date.slice(0, 4) !== String(new Date().getFullYear()) ? r.date.slice(2, 4) + "/" : "") + r.date.slice(5).replace("-", "/")); h("span", "rname", L, r.short);
-    [r.combo, r.tag, r.n !== 18 ? r.n + " 洞" : ""].filter(Boolean).forEach(x => h("span", "rsub", L, x));
+    [r.tag, r.n !== 18 ? r.n + " 洞" : ""].filter(Boolean).forEach(x => h("span", "rsub", L, x));
     const R = h("div", "rtot", top); h("b", full(r) && T.score && r.strokes <= T.score ? "ok" : "", R, r.strokes); h("span", "", R, (r.over > 0 ? "+" : "") + r.over);
     const st = h("div", "rc2", c), stat = (k, v, ok) => { const d = h("div", "", st); h("span", "", d, k + " "); h("b", ok ? "ok" : "", d, v == null ? "—" : v); };
     stat("推桿", r.putts, full(r) && r.putts != null && r.putts <= T.putts); stat("三推", r.putts == null ? null : threeOf(r), full(r) && threeOf(r) <= T.three); stat("爆桿", blowOf(r), full(r) && blowOf(r) <= T.blow);
