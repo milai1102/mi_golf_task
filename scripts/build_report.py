@@ -1334,7 +1334,7 @@ DRAW.roundlist = (sec, host) => {
     h("p", "note", box, "1W 一號木　H 鐵木　6i 六鐵　PT 推桿　單位：碼");
     return box; };
   const T = sec.targets || {}, full = r => r.cat === "full";
-  const FLAT = 2, F5 = sec.data.filter(full).slice(0, 5), AVG5 = F5.length ? F5.reduce((a, r) => a + r.strokes, 0) / F5.length : null;
+  const FLAT = 2, FULL = sec.data.filter(full), F5 = FULL.slice(0, 5), AVG5 = F5.length ? F5.reduce((a, r) => a + r.strokes, 0) / F5.length : null;
   const blowOf = r => r.holes.filter(x => x[6] - x[1] >= 3).length, threeOf = r => r.holes.filter(x => x[4] >= 3).length;
   const lvl = dv => dv <= -1 ? "b" : dv === 0 ? "p" : dv === 1 ? "g" : dv === 2 ? "d" : "x";
   const cardEl = r => { const c = document.createElement("div"); c.className = "rcard"; c.tabIndex = 0;
@@ -1362,7 +1362,7 @@ DRAW.roundlist = (sec, host) => {
       scrollBy(0, c.getBoundingClientRect().top - top0); };
     rows.forEach(r => { const m = r.date.slice(0, 7); if (m !== month) { month = m; h("div", "rmonth", list, m.slice(0, 4) + " 年 " + (+m.slice(5)) + " 月"); }
       const c = cardEl(r); list.appendChild(c); c.addEventListener("click", () => pick(r, c));
-      if (F5.length > 1 && r === F5[F5.length - 1]) { const e5 = h("div", "r5", list), sp = h("span", "", e5); sp.append("最近 " + F5.length + " 場　平均 "); h("b", "", sp, AVG5.toFixed(1)); sp.append("　最好 "); h("b", "", sp, Math.min(...F5.map(x => x.strokes))); }
+      [5, 10, 20].forEach(n => { if (FULL.length >= n && r === FULL[n - 1]) { const g = FULL.slice(0, n), e5 = h("div", "r5", list), sp = h("span", "", e5); sp.append("最近 " + n + " 場　平均 "); h("b", "", sp, (g.reduce((a, x) => a + x.strokes, 0) / n).toFixed(1)); sp.append("　最好 "); h("b", "", sp, Math.min(...g.map(x => x.strokes))); } });
       c.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(r, c); } const dir = e.key === "ArrowDown" ? 1 : e.key === "ArrowUp" ? -1 : 0; if (!dir) return; e.preventDefault(); const cs = [...list.querySelectorAll(".rcard")], t2 = cs[cs.indexOf(c) + dir]; if (t2) { t2.focus(); if (WIDE) t2.click(); } }); });
     if (WIDE && rows.length) { const cs = [...list.querySelectorAll(".rcard")], i = Math.max(0, rows.indexOf(sel)); pick(rows[i], cs[i]); } };
   head.remove();
