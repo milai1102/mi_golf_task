@@ -874,9 +874,9 @@ nav{margin:10px 0 0}nav a{font-size:12px;padding:3px 10px}
 .r2{display:grid;grid-template-columns:372px minmax(0,1fr);gap:20px;align-items:start}.r2 .rlist{position:sticky;top:64px;max-height:calc(100vh - 84px);overflow-y:auto;padding-right:6px}.rpane{min-width:0;border:1px solid var(--border);border-radius:14px;padding:6px 18px 16px;background:var(--surface)}
 .rmonth{font-size:12px;color:var(--muted);padding:6px 4px;position:sticky;top:0;background:var(--surface);z-index:5}
 .rcard{border:1px solid var(--border);border-radius:14px;padding:12px 14px 10px;margin-bottom:10px;background:var(--page);cursor:pointer;outline:none}.rcard:hover,.rcard:focus-visible{border-color:var(--axis)}.rcard.on{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
-.rc1{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.rname{font-size:19px;font-weight:700;line-height:1.25}.rsub{font-size:12px;color:var(--muted)}
+.rc1{display:flex;justify-content:space-between;align-items:center;gap:10px}.rttl{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px;min-width:0}.rdate{font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums}.rname{font-size:19px;font-weight:700;line-height:1.25}.rsub{font-size:12px;color:var(--muted)}
 .rtot{white-space:nowrap;line-height:1}.rtot b{font-size:36px;font-weight:700;font-variant-numeric:tabular-nums}.rtot span{font-size:13px;color:var(--muted);margin-left:6px}
-.rc2{display:flex;gap:18px;margin-top:6px;font-size:13px;color:var(--muted)}.rc2 b{font-size:16px;color:var(--ink);font-variant-numeric:tabular-nums}.rcard b.ok{color:var(--up)}
+.rc2{display:flex;gap:18px;margin-top:2px;font-size:13px;color:var(--muted)}.rc2 b{font-size:16px;color:var(--ink);font-variant-numeric:tabular-nums}.rcard b.ok{color:var(--up)}
 .rbars{display:flex;gap:3px;align-items:flex-end;height:46px;padding-bottom:8px;margin-top:6px;box-sizing:border-box}.rbars i,.rdots i{flex:1;display:block;min-width:0}.rbars i.gap,.rdots i.gap{margin-left:9px}
 .rbars i{border-radius:2px 2px 0 0}.rbars i.p,.rlg i.p{background:var(--up);height:4px}.rbars i.g,.rlg i.g{background:var(--muted)}.rbars i.d,.rlg i.d{background:#ef9f27}.rbars i.x,.rlg i.x{background:var(--down)}.rbars i.b{background:var(--series);height:8px;margin-bottom:-8px;border-radius:0 0 2px 2px}.rlg i.b{background:var(--series)}
 .rdots{display:flex;gap:3px;height:6px;margin-top:3px}.rdots i.d::after{content:"";display:block;width:6px;height:6px;border-radius:50%;background:var(--down);margin:0 auto}
@@ -1333,8 +1333,8 @@ DRAW.roundlist = (sec, host) => {
   const blowOf = r => r.holes.filter(x => x[6] - x[1] >= 3).length, threeOf = r => r.holes.filter(x => x[4] >= 3).length;
   const lvl = dv => dv <= -1 ? "b" : dv === 0 ? "p" : dv === 1 ? "g" : dv === 2 ? "d" : "x";
   const cardEl = r => { const c = document.createElement("div"); c.className = "rcard"; c.tabIndex = 0;
-    const top = h("div", "rc1", c), L = h("div", "", top), nm = h("div", "rname", L, r.short), sub = h("div", "rsub", L, r.date.slice(5).replace("-", "/") + (r.date.slice(0, 4) !== String(new Date().getFullYear()) ? "/" + r.date.slice(2, 4) : ""));
-    [r.combo, r.tag, r.n !== 18 ? r.n + " 洞" : ""].filter(Boolean).forEach(x => h("span", "", sub, "　" + x));
+    const top = h("div", "rc1", c), L = h("div", "rttl", top); h("span", "rdate", L, (r.date.slice(0, 4) !== String(new Date().getFullYear()) ? r.date.slice(2, 4) + "/" : "") + r.date.slice(5).replace("-", "/")); h("span", "rname", L, r.short);
+    [r.combo, r.tag, r.n !== 18 ? r.n + " 洞" : ""].filter(Boolean).forEach(x => h("span", "rsub", L, x));
     const R = h("div", "rtot", top); h("b", full(r) && T.score && r.strokes <= T.score ? "ok" : "", R, r.strokes); h("span", "", R, (r.over > 0 ? "+" : "") + r.over);
     const st = h("div", "rc2", c), stat = (k, v, ok) => { const d = h("div", "", st); h("span", "", d, k + " "); h("b", ok ? "ok" : "", d, v == null ? "—" : v); };
     stat("推桿", r.putts, full(r) && r.putts != null && r.putts <= T.putts); stat("三推", r.putts == null ? null : threeOf(r), full(r) && threeOf(r) <= T.three); stat("爆桿", blowOf(r), full(r) && blowOf(r) <= T.blow);
