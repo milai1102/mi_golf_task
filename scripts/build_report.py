@@ -4,7 +4,7 @@
 {id, title, note, kind, data, table}，加進 SECTIONS，並在頁面的 DRAW 物件加對應的繪圖函式。
 用法：python3 scripts/build_report.py
 """
-import csv, datetime, json, os, shutil, sqlite3, statistics, tempfile
+import csv, datetime, glob, json, os, shutil, sqlite3, statistics, tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB, OUT = os.path.join(ROOT, "data/processed/golf.db"), os.path.join(ROOT, "reports/index.html")
@@ -708,6 +708,36 @@ def _path_offset(pt, pts, k):
         if best is None or d < abs(best): best = d if vx * dy - vy * dx >= 0 else -d
     return best
 
+PREVIEW_PIN_TOP = 58      # Garmin 的球洞圖：旗桿離輪廓上緣約 58 碼（打過的 380 洞：中位數 58，一半的洞在 54 到 63 之間），用來估沒打過的球場每像素幾碼
+PREVIEW_TEE_BOTTOM = 65   # 發球台離輪廓下緣約 65 碼（一半的洞在 52 到 83 之間）
+
+def preview_courses():
+    """還沒打過的球場（data/course_preview/*.json）：只有 Garmin 的球洞輪廓和旗桿座標，沒有擊球紀錄。比例尺和發球台位置是估的。"""
+    names = {r["garmin_name"]: r for r in csv.DictReader(open(os.path.join(ROOT, "data/raw/course_names.csv"), encoding="utf-8"))}
+    out = []
+    for fp in sorted(glob.glob(os.path.join(ROOT, "data/course_preview/*.json"))):
+        pv = json.load(open(fp, encoding="utf-8")); cid = pv["cid"]
+        gp = os.path.join(ROOT, "data/course_geo", f"{cid}.json")
+        if cid not in GEO: GEO[cid] = json.load(open(gp))["holes"] if os.path.exists(gp) else {}
+        holes = []
+        for H in pv["holes"]:
+            g = GEO[cid].get(str(H["h"]), {}); o = (g.get("outline") or [[]])[0]
+            if not o: continue
+            lat, lon, px, py = H["pin"]; y0 = min(q[1] for q in o); y1 = max(q[1] for q in o)
+            k = min(1.1, max(0.3, PREVIEW_PIN_TOP / max(20, py - y0)))
+            ty = y1 - PREVIEW_TEE_BOTTOM / k; xs = [q[0] for q in o if abs(q[1] - ty) < 25] or [px]
+            tee = [round((min(xs) + max(xs)) / 2), round(ty)]
+            yd = round(k * ((tee[0] - px) ** 2 + (tee[1] - py) ** 2) ** 0.5)
+            if H.get("yd"):                                                      # 有計分卡上的碼數：沿「旗桿→發球台」方向移動發球台，讓洞長等於計分卡
+                f = H["yd"] / max(1, yd); tee = [round(px + (tee[0] - px) * f), round(py + (tee[1] - py) * f)]; yd = H["yd"]
+            holes.append({"h": H["h"], "par": H["par"], "plays": [], "yd": yd, "k": round(k, 4), "pin": [px, py], "tee": tee, "pll": [lat, lon]})
+        if not holes: continue
+        nm = names.get(pv["garmin_name"], {})
+        out.append({"short": nm.get("short") or pv["garmin_name"], "name": nm.get("name_zh") or pv["garmin_name"], "n": 0, "last": "", "preview": 1,
+                    "layouts": [{"cid": cid, "label": pv.get("label", ""), "holes": holes}],
+                    "ll": [round(sum(h["pll"][0] for h in holes) / len(holes), 5), round(sum(h["pll"][1] for h in holes) / len(holes), 5)], "region": ""})
+    return out
+
 def section_caddie(con):
     """AI 桿弟的模擬器：在球洞圖上點一個位置，依歷史紀錄建議球桿與距離。"""
     courses = section_courses(con)["data"]; fit = caddie_geofit(); lateral = {}
@@ -737,6 +767,8 @@ def section_caddie(con):
             L["holes"] = keep
         c["layouts"] = [L for L in c["layouts"] if L["holes"]]
     courses = [c for c in courses if c["layouts"]]
+    have = {L["cid"] for c in courses for L in c["layouts"]}
+    courses += [c for c in preview_courses() if c["layouts"][0]["cid"] not in have]
     m = caddie_model(con)
     q = lambda v, f: v[min(len(v) - 1, int(len(v) * f))]
     pool = sorted(o / y for v in lateral.values() for o, y in v)                                    # 樣本少的球桿：用全部球桿「偏離 ÷ 距離」的比例
@@ -1395,11 +1427,11 @@ DRAW.caddie = (sec, host) => {
   const segDist = (p, a, b) => { const vx = b[0] - a[0], vy = b[1] - a[1], t = Math.max(0, Math.min(1, ((p[0] - a[0]) * vx + (p[1] - a[1]) * vy) / (vx * vx + vy * vy || 1))); return Math.hypot(p[0] - a[0] - t * vx, p[1] - a[1] - t * vy); };
   const locate = (lat, lon) => { let bestH = null; sec.data.forEach((c, i) => { if (!c.ll || Math.abs(c.ll[0] - lat) > 0.05 || Math.abs(c.ll[1] - lon) > 0.05) return; c.layouts.forEach((L, j) => L.holes.forEach((H, n) => { if (!H.ll) return; const p = toPx(H, lat, lon), dd = segDist(p, H.tee, H.pin) * H.k; if (!bestH || dd < bestH.dd) bestH = { dd, i, j, n, p }; })); }); return bestH; };
   const speak = t => { try { if (!("speechSynthesis" in window)) return; speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t.replace(/杆/g, "桿")); u.lang = "zh-TW"; speechSynthesis.speak(u); } catch (e) {} };
-  const here = (lat, lon, acc) => { const b = locate(lat, lon); if (!b || b.dd > 120) { gpsMsg.textContent = "不在打過的球場上"; return; } ci = b.i; li = b.j; hi = b.n; pos = [Math.round(b.p[0]), Math.round(b.p[1])]; lieAuto = true; draw(); gpsMsg.textContent = acc ? `定位誤差約 ${Math.round(acc * 1.09361)} 碼` : ""; speak(lastSay); lieRow.scrollIntoView({ behavior: "smooth", block: "start" }); };
+  const herePin = (lat, lon, acc) => { const yd = (H) => { const dy = (lat - H.pll[0]) * 121605, dx = (lon - H.pll[1]) * 121605 * Math.cos(lat * Math.PI / 180); return Math.hypot(dx, dy); }; let best = null; const c0 = cur(); if (c0.C.preview && c0.H.pll && yd(c0.H) < 700) best = { i: ci, j: li, n: hi, d: yd(c0.H) }; else sec.data.forEach((c, i) => { if (!c.preview) return; c.layouts.forEach((L, j) => L.holes.forEach((H, n) => { const d = yd(H); if (d < 700 && (!best || d < best.d)) best = { i, j, n, d }; })); }); if (!best) return false; ci = best.i; li = best.j; hi = best.n; const c1 = cur(), P = pathOf(c1.H, c1.geo), a = P.at(Math.max(0, P.total - best.d)); pos = [Math.round(a[0]), Math.round(a[1])]; lieAuto = false; lie = best.d < 20 ? "G" : P.total - best.d < 14 ? "T" : "F"; draw(); gpsMsg.textContent = `沒打過的球場：只知道離旗桿 ${Math.round(best.d)} 碼，洞號和球位請自己選`; speak(lastSay); return true; }; const here = (lat, lon, acc) => { const b = locate(lat, lon); if (!b || b.dd > 120) { if (!herePin(lat, lon, acc)) gpsMsg.textContent = "不在打過的球場上"; return; } ci = b.i; li = b.j; hi = b.n; pos = [Math.round(b.p[0]), Math.round(b.p[1])]; lieAuto = true; draw(); gpsMsg.textContent = acc ? `定位誤差約 ${Math.round(acc * 1.09361)} 碼` : ""; speak(lastSay); lieRow.scrollIntoView({ behavior: "smooth", block: "start" }); };
   gpsBtn.addEventListener("click", () => { if (!navigator.geolocation) { gpsMsg.textContent = "這個瀏覽器不支援定位"; return; } gpsMsg.textContent = "定位中…"; try { if ("speechSynthesis" in window) speechSynthesis.speak(new SpeechSynthesisUtterance("")); } catch (e) {}
     navigator.geolocation.getCurrentPosition(g => here(g.coords.latitude, g.coords.longitude, g.coords.accuracy), e => { gpsMsg.textContent = e.code === 1 ? "沒有定位權限" : "定位失敗"; }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }); });
   const top = h("div", "cad-top"), selC = h("select", "", top), selL = h("select", "", top), holes = h("div", "cad-holes", host), wrap = h("div", "cad-wrap", host), mapBox = h("div", "cad-map", wrap), side = h("div", "cad-side", wrap), big = h("div", "cad-big"), lieRow = h("div", "filters", side), more = h("details", "cad-more", side), res = (h("summary", "", more, "更多：打得好／打不好、左右偏差、障礙物、各桿比較"), h("div", "cad-res", more)); if (NARROW()) wrap.before(big); else side.prepend(big); host.appendChild(top); { const bar = h("div", "cad-bar"); host.prepend(bar); bar.append(gpsRow, holes); const nav = document.querySelector(".ptabs"); if (!NARROW() && nav) bar.style.top = nav.offsetHeight + "px"; } try { const sv = JSON.parse(localStorage.getItem("mi-caddie") || "null"); if (sv && sec.data[sv[0]] && sec.data[sv[0]].short === sv[2]) { ci = sv[0]; li = sec.data[ci].layouts[sv[1]] ? sv[1] : 0; } } catch (e) {}
-  sec.data.forEach((c, i) => { const o = h("option", "", selC, `${c.short}（${c.n} 場）`); o.value = i; });
+  sec.data.forEach((c, i) => { const o = h("option", "", selC, c.preview ? `${c.short}（沒打過）` : `${c.short}（${c.n} 場）`); o.value = i; });
   const interp = (tab, d) => { if (d <= tab[0][0]) return tab[0][1]; const n = tab.length; if (d >= tab[n - 1][0]) return tab[n - 1][1]; for (let i = 1; i < n; i++) if (d <= tab[i][0]) { const a = tab[i - 1], b = tab[i]; return a[1] + (b[1] - a[1]) * (d - a[0]) / (b[0] - a[0]); } return tab[n - 1][1]; };
   const tabOf = l => M.E[l === "F" || l === "T" ? "F" : "R"], after = (l, d) => l === "G" ? M.green : interp(tabOf(l), d) + (l === "B" ? Math.max(0.1, M.bunker) : 0), afterSe = (l, d) => l === "G" ? 0.05 : interp(tabOf(l).map(r => [r[0], r[3]]), d);
   const q = (a, f) => a[Math.min(a.length - 1, Math.floor(a.length * f))];

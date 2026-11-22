@@ -480,3 +480,15 @@ python3 scripts/build_report.py      # golf.db → reports/index.html（整頁�
 - 使用者：滑動時最上面的按鈕和洞號不能動，這樣才方便切換；卡片和圖可以滑。測試時用手點圖，實際上場是按按鈕，所以按鈕要在很好按的地方。
 - 做法：「我在這裡，怎麼打？」按鈕和洞號列包在 `.cad-bar` 裡，`position:sticky` 黏在頂端（手機 `top:0`；電腦黏在頁籤列下方，`top` 用 `.ptabs` 的高度）。按鈕加大（19px、上下 16px），洞號加大（46px、16px 字）。
 - 其餘（大卡、球洞圖、球位、更多、球場選單）在下面照常捲動。
+
+## AI 桿弟：還沒打過的球場（2026-11-23）
+
+- 使用者要在桿弟頁用**沒打過的球場**（下場前先建好）。起因：2026-12-03 和 12 月中要去打「第一」（福爾摩莎第一，Garmin 的 Formosa First Country Club）和「楊梅」。使用者的方向：從圖資或公開來源下手。
+- 查過的公開來源：**OpenStreetMap 不夠用**。台灣 126 個有名字的球場只有 16 個畫了球洞線（`golf=hole`），球道幾乎都沒畫；楊梅只有 11 個果嶺、43 個沙坑，第一只有 23 個果嶺，都沒有球道、發球台、洞號。Overpass 可以從瀏覽器直接查（POST 到 `overpass-api.de/api/interpreter`，常常 502 要重試）。
+- **Garmin 可以，但要先有一張計分卡**：模擬場次（`roundType = SIMULATION`）的 `shot/scorecard/ID/hole` 一樣有每洞的地圖網址和旗桿座標（經緯度＋像素），只是沒有擊球。Garmin 沒有可以直接查球場的介面（`course/…` 的各種路徑都是 404）。所以新球場的做法：**請使用者先在 Garmin 用那個球場開一場模擬**，再照下面抓。
+- 資料：`data/course_preview/<球場代碼>.json`（`cid, garmin_name, layout, label, source, pars, holes[{h, par, pin:[緯度, 經度, x, y], yd?}]`）＋ `data/course_geo/<球場代碼>.json`（輪廓，和打過的球場同格式）＋ `data/raw/course_names.csv` 加一列全名與簡稱。目前只有 `032568` 第一（Arnold 區，來自 2026-11-17 的模擬計分卡 392242565）。
+- `build_report.py` 的 `preview_courses()`：打過的球場裡沒有這個代碼時，才把它加進桿弟頁（選單顯示「第一（沒打過）」）。實際打過之後有了擊球座標，就自動變成一般球場，預覽檔可以留著。
+  - **比例尺是估的**：Garmin 的球洞圖有固定的留白，打過的 380 洞裡，旗桿離輪廓上緣的實際距離中位數 58 碼（一半的洞在 54 到 63 之間），所以每像素幾碼 ≈ 58 ÷（旗桿到輪廓上緣的像素）。發球台離輪廓下緣約 65 碼（一半在 52 到 83 之間）。常數 `PREVIEW_PIN_TOP`、`PREVIEW_TEE_BOTTOM`。洞長因此有一成左右的誤差。
+  - 預覽檔的洞可以加 `yd`（計分卡上的碼數），有的話發球台會沿「旗桿→發球台」方向移到剛好那個洞長。第一的各洞碼數還沒填（要使用者提供計分卡，或找到公開的計分卡）。
+- **定位**：沒有擊球座標就算不出經緯度到圖上的對應（每洞只有旗桿一個點），所以「我在這裡」在沒打過的球場只算**離旗桿幾碼**（`herePin()`）：洞用目前選的那一洞（700 碼內），否則取最近的旗桿；球放在球道中線上那個距離的位置，球位預設球道，洞號和球位要自己選。訊息會寫「沒打過的球場：只知道離旗桿 N 碼」。
+- 抓的步驟（內建瀏覽器，`browser_repl`）：① Garmin Connect 頁面上讀計分卡的 `holeShots`（網址、旗桿）和 `courseSnapshots[0]`（名稱、標準桿）；② 把這包 JSON 用 base64 放在第一洞地圖網址的 `#` 後面導頁過去；③ 在那一頁 `fetch` repository 上的 `scripts/garmin_course_geo.js`（raw.githubusercontent.com）再 `eval`，逐洞 `G_.classify(url)`（放背景跑、輪詢，18 洞約 20 秒）；④ 結果連同旗桿座標 `JSON → deflate → 像素通道`（1024×768 的畫面、格子 4px、256×192 格，一張 12 KB）用 `tab.screenshot()` 帶回，解碼後驗 CRC；⑤ Python 再簡化樹（容差 3.2、面積 260 以上）。
