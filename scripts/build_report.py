@@ -870,7 +870,7 @@ nav{margin:10px 0 0}nav a{font-size:12px;padding:3px 10px}
 .plater{font-size:15px;color:var(--ink2);line-height:1.9;margin:0;padding-left:22px}.plan .lead+h3{margin-top:8px}
 
 .ptabs{position:sticky;top:0;z-index:30}
-.rhd{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;color:var(--ink2);margin:2px 2px 8px}.rhd b{font-size:24px;color:var(--ink)}
+.rhd{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;color:var(--ink2);margin:2px 2px 8px}.rhd b{font-size:24px;color:var(--ink)}.r5{display:flex;align-items:center;gap:10px;margin:2px 2px 12px;font-size:13px;color:var(--ink2);white-space:nowrap}.r5::before,.r5::after{content:"";flex:1;height:1px;background:var(--axis)}.r5 b{font-size:20px;color:var(--ink);font-variant-numeric:tabular-nums}
 .r2{display:grid;grid-template-columns:372px minmax(0,1fr);gap:20px;align-items:start}.r2 .rlist{position:sticky;top:64px;max-height:calc(100vh - 84px);overflow-y:auto;padding-right:6px}.rpane{min-width:0;border:1px solid var(--border);border-radius:14px;padding:6px 18px 16px;background:var(--surface)}
 .rmonth{font-size:12px;color:var(--muted);padding:6px 4px;position:sticky;top:0;background:var(--surface);z-index:5}
 .rcard{border:1px solid var(--border);border-radius:14px;padding:12px 14px 10px;margin-bottom:10px;background:var(--page);cursor:pointer;outline:none}.rcard:hover,.rcard:focus-visible{border-color:var(--axis)}.rcard.on{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
@@ -1362,9 +1362,10 @@ DRAW.roundlist = (sec, host) => {
       scrollBy(0, c.getBoundingClientRect().top - top0); };
     rows.forEach(r => { const m = r.date.slice(0, 7); if (m !== month) { month = m; h("div", "rmonth", list, m.slice(0, 4) + " 年 " + (+m.slice(5)) + " 月"); }
       const c = cardEl(r); list.appendChild(c); c.addEventListener("click", () => pick(r, c));
+      if (F5.length > 1 && r === F5[F5.length - 1]) { const e5 = h("div", "r5", list), sp = h("span", "", e5); sp.append("最近 " + F5.length + " 場　平均 "); h("b", "", sp, AVG5.toFixed(1)); sp.append("　最好 "); h("b", "", sp, Math.min(...F5.map(x => x.strokes))); }
       c.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(r, c); } const dir = e.key === "ArrowDown" ? 1 : e.key === "ArrowUp" ? -1 : 0; if (!dir) return; e.preventDefault(); const cs = [...list.querySelectorAll(".rcard")], t2 = cs[cs.indexOf(c) + dir]; if (t2) { t2.focus(); if (WIDE) t2.click(); } }); });
     if (WIDE && rows.length) { const cs = [...list.querySelectorAll(".rcard")], i = Math.max(0, rows.indexOf(sel)); pick(rows[i], cs[i]); } };
-  { const f5 = F5; if (f5.length) { h("span", "", head, "最近 " + f5.length + " 場"); const sp = h("span", "", head); sp.append("平均 "); h("b", "", sp, (f5.reduce((a, r) => a + r.strokes, 0) / f5.length).toFixed(1)); sp.append("　最好 "); h("b", "", sp, Math.min(...f5.map(r => r.strokes))); } }
+  head.remove();
   cats.forEach(([key, label]) => { const n = sec.data.filter(r => r.cat === key).length, b = h("button", "fchip" + (on[key] ? " on" : ""), bar2, `${label} ${n}`);
     b.addEventListener("click", () => { on[key] = !on[key]; b.classList.toggle("on", on[key]); draw(); }); });
   { const lg = h("div", "rlg", host); [["p", "Par"], ["g", "Bogey"], ["d", "Double"], ["x", "爆桿"], ["b", "Birdie"]].forEach(([k, t]) => { const sp = h("span", "", lg); h("i", k, sp); sp.append(t); }); const sp = h("span", "", lg); h("i", "dot", sp); sp.append("三推以上"); h("span", "", lg, "柱子越高＝超出標準桿越多"); if (AVG5 != null) { const s3 = h("span", "", lg); h("b", "dn", s3, "▼"); s3.append(" 比最近 " + F5.length + " 場平均少　"); h("b", "up", s3, "▲"); s3.append(" 多（差 " + FLAT + " 桿以內不標）"); } }
