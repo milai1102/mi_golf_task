@@ -850,7 +850,7 @@ th{color:var(--ink2);font-weight:500}
 .dots{font-size:12px;line-height:1;height:12px;letter-spacing:1px;color:var(--ink2);margin-top:7px;white-space:nowrap}
 .dots.three,.sclg b.three{color:var(--down);font-weight:700}.sclg b.three{letter-spacing:1px}
 .sclg{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--ink2);padding:10px 0 2px}.sclg span{display:inline-flex;align-items:center;gap:7px}.sclg .m{width:12px;height:12px;border-width:1.5px;outline-width:1.5px;outline-offset:1.5px}
-.tabs{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px}.chart .legend svg,.chart .sclg svg{display:inline-block;width:auto;height:auto;flex:none}.panel .legend{margin-top:10px}.panel{padding:6px 0 4px}
+.tabs{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px}.dtabs{flex-wrap:nowrap;gap:6px}.dtabs .fchip{flex:1 1 0;min-width:0;padding-left:0;padding-right:0;text-align:center;white-space:nowrap}.chart .legend svg,.chart .sclg svg{display:inline-block;width:auto;height:auto;flex:none}.panel .legend{margin-top:10px}.panel{padding:6px 0 4px}
 .maps{display:grid;gap:10px;margin-top:8px}.maps figure{margin:0;background:#0c0c0b;border-radius:10px;padding:6px 4px 4px;min-width:0}.maps figcaption{font-size:12px;color:#c3c2b7;text-align:center;padding-bottom:2px;white-space:nowrap}
 .maps svg{display:block;width:100%}.maps.strip{width:calc(100vw - 46px);display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;gap:8px;padding-bottom:6px}.maps.strip figure{flex:0 0 calc((100% - (var(--per) - 1) * 8px) / var(--per));scroll-snap-align:start}.sub{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:12px;color:var(--ink2);margin-top:6px}.sub .fchip{font-size:12px;padding:2px 10px}
 .ptabs{display:flex;margin:16px 0 4px;border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:4px;gap:4px}.ptabs a{flex:1;text-align:center;font-size:15px;font-weight:600;color:var(--ink2);text-decoration:none;padding:9px 6px;border-radius:9px;white-space:nowrap}.ptabs a.on{background:var(--ink);color:var(--surface)}
@@ -1310,10 +1310,10 @@ DRAW.roundlist = (sec, host) => {
     draw(); };
   // 點開一場：計分卡在上，下面一排按鈕選要看的細節
   const detail = r => { const box = document.createElement("div"); h("div", "scname", box, r.course + (WIDE_R() ? "　" + r.date : "")); box.appendChild(card(r));
-    const tabs = h("div", "tabs", box), panel = h("div", "panel", box); let open = null;
-    const items = [["逐洞擊球明細", p => p.appendChild(shotsTable(r))]];
-    if (r.clubs && r.clubs.length) items.push(["各桿距離", p => clubPanel(r, p)]);
-    if (r.gps) { items.push(["一號木開球", p => drivePanel(r, p)]); items.push(["球道揮桿圖", p => mapPanel(r, p)]); }
+    const tabs = h("div", "tabs dtabs", box), panel = h("div", "panel", box); let open = null;
+    const items = [["明細", p => p.appendChild(shotsTable(r))]];
+    if (r.clubs && r.clubs.length) items.push(["距離", p => clubPanel(r, p)]);
+    if (r.gps) { items.push(["開球", p => drivePanel(r, p)]); items.push(["揮桿圖", p => mapPanel(r, p)]); }
     items.forEach(([label, fill]) => { const b = h("button", "fchip", tabs, label);
       b.addEventListener("click", () => { const was = open === label; open = was ? null : label; panel.replaceChildren(); [...tabs.children].forEach(c => c.classList.toggle("on", !was && c === b)); if (!was) fill(panel); }); });
     return box; };
