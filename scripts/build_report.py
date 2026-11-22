@@ -682,9 +682,35 @@ def caddie_geofit():
         out[key] = [round(lat0, 7), round(lon0, 7)] + [round(float(x), 3) for x in list(cx) + list(cy)]
     return out
 
+def caddie_path(tee, pin, k, fairways):
+    """球道的中線：發球台 → 球道每 40 碼的中心點 → 旗桿（和頁面上 JS 的 pathOf 同一個算法）。回傳折線的點。"""
+    L = ((pin[0] - tee[0]) ** 2 + (pin[1] - tee[1]) ** 2) ** 0.5 or 1
+    ux, uy = (pin[0] - tee[0]) / L, (pin[1] - tee[1]) / L; bins = {}
+    for poly in fairways or []:
+        xs = [q[0] for q in poly]; ys = [q[1] for q in poly]
+        for x in range(min(xs), max(xs) + 1, 5):
+            for y in range(min(ys), max(ys) + 1, 5):
+                dx, dy = x - tee[0], y - tee[1]; t = (dx * ux + dy * uy) * k; lat = (dx * uy - dy * ux) * k
+                if t < 70 or t > L * k - 40 or abs(lat) > 70 or not _inside((x, y), poly): continue
+                bins.setdefault(int(t // 40), []).append((x, y))
+    mid = [(sum(q[0] for q in v) / len(v), sum(q[1] for q in v) / len(v)) for b, v in sorted(bins.items()) if len(v) >= 6]
+    pts = [tuple(tee)] + mid + [tuple(pin)]
+    if sum(((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2) ** 0.5 for a, b in zip(pts, pts[1:])) > L * 1.12: pts = [tuple(tee), tuple(pin)]
+    return pts
+
+def _path_offset(pt, pts, k):
+    """點到折線的距離（碼）；正值＝在行進方向的右邊。"""
+    best = None
+    for a, b in zip(pts, pts[1:]):
+        vx, vy = b[0] - a[0], b[1] - a[1]; n2 = vx * vx + vy * vy or 1
+        t = max(0, min(1, ((pt[0] - a[0]) * vx + (pt[1] - a[1]) * vy) / n2)); dx, dy = pt[0] - a[0] - t * vx, pt[1] - a[1] - t * vy
+        d = (dx * dx + dy * dy) ** 0.5 * k
+        if best is None or d < abs(best): best = d if vx * dy - vy * dx >= 0 else -d
+    return best
+
 def section_caddie(con):
     """AI 桿弟的模擬器：在球洞圖上點一個位置，依歷史紀錄建議球桿與距離。"""
-    courses = section_courses(con)["data"]; fit = caddie_geofit()
+    courses = section_courses(con)["data"]; fit = caddie_geofit(); lateral = {}
     for c in courses:
         for L in c["layouts"]:
             keep = []
@@ -703,14 +729,26 @@ def section_caddie(con):
                 ks.sort(); tx = sorted(t[0] for t in tees); ty = sorted(t[1] for t in tees)
                 H["k"] = round(ks[len(ks) // 2], 4); H["pin"] = pin; H["tee"] = [tx[len(tx) // 2], ty[len(ty) // 2]]
                 keep.append(H)
+                path = caddie_path(H["tee"], pin, H["k"], GEO.get(L["cid"], {}).get(str(H["h"]), {}).get("fairway", []))
+                for p in H["plays"]:
+                    for sh in p["shots"][:-1]:                                                      # 每洞最後一筆的落點被設成旗桿，不能用
+                        if sh[0] in CADDIE_BAG and abs(_path_offset((sh[2], sh[3]), path, H["k"])) <= 15 and sh[6] >= 40:      # 從中線附近打出去的球，落點偏離中線幾碼
+                            lateral.setdefault(sh[0], []).append((_path_offset((sh[4], sh[5]), path, H["k"]), sh[6]))
             L["holes"] = keep
         c["layouts"] = [L for L in c["layouts"] if L["holes"]]
     courses = [c for c in courses if c["layouts"]]
     m = caddie_model(con)
+    q = lambda v, f: v[min(len(v) - 1, int(len(v) * f))]
+    pool = sorted(o / y for v in lateral.values() for o, y in v)                                    # 樣本少的球桿：用全部球桿「偏離 ÷ 距離」的比例
+    m["lat"] = {c: [round(q(sorted(o for o, _ in v), 0.1)), round(q(sorted(o for o, _ in v), 0.5)), round(q(sorted(o for o, _ in v), 0.9)), len(v)] for c, v in lateral.items() if len(v) >= 20}
+    m["latr"] = [round(q(pool, 0.1), 3), round(q(pool, 0.5), 3), round(q(pool, 0.9), 3)] if pool else [-0.15, 0, 0.15]
+    print("左右偏差（碼，右為正）[十分位, 中位數, 九十分位, 球數]:", m["lat"], "比例:", m["latr"])
     note = ("在圖上點一下，當成球現在的位置。系統算出離旗桿幾碼、判斷球位，再用你的歷史紀錄估計「用每一支桿，預期還要幾桿進洞」，建議數字最小的那一支。"
             "做法：①「還要幾桿」的表：你每一筆擊球之前的位置（離旗桿幾碼、什麼球位）→ 那一洞從這一桿起實際又用了幾桿，分組取平均並修成不遞減。"
             "② 每支桿的結果直接取你用這支桿打過的球：離旗桿在這支桿打得到的範圍內，取起點距離相近（±25%）的那些球實際的結果；超出範圍就取全揮桿的前進距離，算出落點再查表。"
             "瞄準線：沿著球道走（球道每 40 碼取一個中心點，從發球台連到旗桿），狗腿洞的距離是沿著球道量的。沿球道的長度比直線多出 12% 以上時，當成輪廓辨識有誤，改用直線。球離這條線超過 30 碼時也改成直接指向旗桿。"
+            "每一桿下面的兩行是分支：「打得好」＝這支桿十球裡第九遠的距離、下一桿假設在球道；「打不好」＝十球裡第二短的距離、下一桿假設在長草；各自寫出剩幾碼、接哪一支、照常態還要幾桿。"
+            "黃色區域是每一桿的落點範圍，不是一個點：前後是這支桿十球有八球的距離，左右是從球道中線附近打出去的球、落點偏離中線的十球有八球範圍（所以你的右曲會讓整個區域偏右）；黃色圓點是最常見的落點。左右的樣本不到 20 球的球桿，用全部球桿「偏離 ÷ 距離」的比例估計。"
             "路線：從球的位置開始，每一桿選預期桿數最低的球桿（和第二名的差距在誤差內、而第二名的球數多三倍以上時，選球數多的那一支），照它的常態距離前進，下一桿假設在球道，直到上果嶺，再加兩推。「打得好可上果嶺」＝這支桿十球裡最遠的那一球到得了。「你從這裡平均幾桿」是第一桿的預期桿數，通常比常態路線多，因為會有打壞的球。"
             "③ 預期桿數＝1＋這些結果的平均，± 是標準誤（含查表那張表本身的誤差）。兩支桿的差距小於誤差時不能說哪一支比較好。"
             f"資料：正規球場 {m['shots']} 筆擊球；沙坑樣本少，用「比長草多 {m['bunker']} 桿」估計；果嶺上平均 {m['green']} 推。"
@@ -926,7 +964,7 @@ PAGE = r"""<!DOCTYPE html>
 body{margin:0;background:var(--page);color:var(--ink);font-family:-apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;line-height:1.6}
 .wrap{max-width:1040px;margin:0 auto;padding:28px 20px 60px}
 header h1{font-size:24px;font-weight:600;margin:0 0 4px}
-header p{margin:0;color:var(--ink2);font-size:14px}header{display:flex;align-items:center;justify-content:space-between;gap:10px}.pthm{display:flex;flex:none;border:1px solid var(--axis);border-radius:999px;padding:2px}.pthm button{font:inherit;font-size:12px;line-height:1;padding:5px 9px;border-radius:999px;border:0;background:none;color:var(--muted);cursor:pointer}.pthm button.on{background:var(--ink);color:var(--page)}.cad-gps{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:4px 0 10px}.cad-here{font:inherit;font-size:17px;font-weight:700;padding:13px 20px;border-radius:12px;border:0;background:var(--ink);color:var(--page);cursor:pointer;flex:1 1 220px}.cad-msg{font-size:13px;color:var(--ink2)}.cad-top{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 8px}.cad-top select{font:inherit;font-size:15px;padding:7px 10px;border-radius:8px;border:1px solid var(--axis);background:var(--surface);color:var(--ink);max-width:100%}.cad-holes{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;-webkit-overflow-scrolling:touch}.cad-holes .fchip{flex:none;min-width:40px;text-align:center}.cad-map{background:#0c0c0b;border-radius:10px;padding:6px;touch-action:manipulation}.cad-map svg{display:block;width:100%;cursor:crosshair}.cad-cap{font-size:12px;color:#c3c2b7;text-align:center;padding:6px 0 2px}.cad-side .filters{margin:10px 0 0}.cad-res{border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:14px;margin-top:10px}.cad-res .big{font-size:28px;font-weight:700;margin:2px 0 4px}.cad-res .ln{font-size:14px;color:var(--ink2);margin-top:4px;line-height:1.5}.cad-res .ln b{color:var(--ink);font-variant-numeric:tabular-nums}.cad-say{font-size:18px;font-weight:600;line-height:1.55;margin:6px 0 12px}.cad-steps{display:grid;grid-template-columns:22px max-content max-content minmax(0,1fr);gap:8px 12px;align-items:center;font-size:15px;margin:4px 0 10px}.cad-steps i{font-style:normal;width:22px;height:22px;border-radius:50%;background:#ffd23f;color:#111;font-size:12px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}.cad-steps i.pt{background:var(--grid);color:var(--ink2)}.cad-steps span{font-variant-numeric:tabular-nums}.cad-steps .rem{color:var(--ink2);font-size:13px;min-width:0}.cad-det{margin-top:10px}.cad-doc{display:block;margin:14px 2px 0;font-size:13px;color:var(--ink2)}.cad-det summary{font-size:13px;color:var(--ink2);cursor:pointer}.cad-res .ln.warn{color:var(--trend)}table.cad-t{width:100%;border-collapse:collapse;margin-top:12px;font-size:13px;font-variant-numeric:tabular-nums}table.cad-t th{font-weight:400;color:var(--muted);text-align:right;padding:4px 4px;border-bottom:1px solid var(--axis)}table.cad-t td{text-align:right;padding:6px 4px;border-bottom:1px solid var(--grid)}table.cad-t th:first-child,table.cad-t td:first-child{text-align:left}table.cad-t tr.on td{font-weight:600}@media(min-width:900px){.cad-wrap{display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:20px;align-items:start}}.pmeta{margin:28px 0 0;color:var(--muted);font-size:11px;text-align:center}section.solo>h2{display:none}
+header p{margin:0;color:var(--ink2);font-size:14px}header{display:flex;align-items:center;justify-content:space-between;gap:10px}.pthm{display:flex;flex:none;border:1px solid var(--axis);border-radius:999px;padding:2px}.pthm button{font:inherit;font-size:12px;line-height:1;padding:5px 9px;border-radius:999px;border:0;background:none;color:var(--muted);cursor:pointer}.pthm button.on{background:var(--ink);color:var(--page)}.cad-gps{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:4px 0 10px}.cad-here{font:inherit;font-size:17px;font-weight:700;padding:13px 20px;border-radius:12px;border:0;background:var(--ink);color:var(--page);cursor:pointer;flex:1 1 220px}.cad-msg{font-size:13px;color:var(--ink2)}.cad-top{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 8px}.cad-top select{font:inherit;font-size:15px;padding:7px 10px;border-radius:8px;border:1px solid var(--axis);background:var(--surface);color:var(--ink);max-width:100%}.cad-holes{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;-webkit-overflow-scrolling:touch}.cad-holes .fchip{flex:none;min-width:40px;text-align:center}.cad-map{background:#0c0c0b;border-radius:10px;padding:6px;touch-action:manipulation}.cad-map svg{display:block;width:100%;cursor:crosshair}.cad-cap{font-size:12px;color:#c3c2b7;text-align:center;padding:6px 0 2px}.cad-side .filters{margin:10px 0 0}.cad-res{border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:14px;margin-top:10px}.cad-res .big{font-size:28px;font-weight:700;margin:2px 0 4px}.cad-res .ln{font-size:14px;color:var(--ink2);margin-top:4px;line-height:1.5}.cad-res .ln b{color:var(--ink);font-variant-numeric:tabular-nums}.cad-say{font-size:18px;font-weight:600;line-height:1.55;margin:6px 0 12px}.cad-steps{display:grid;grid-template-columns:22px max-content max-content minmax(0,1fr);gap:8px 12px;align-items:center;font-size:15px;margin:4px 0 10px}.cad-steps i{font-style:normal;width:22px;height:22px;border-radius:50%;background:#ffd23f;color:#111;font-size:12px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}.cad-steps i.pt{background:var(--grid);color:var(--ink2)}.cad-steps span{font-variant-numeric:tabular-nums}.cad-steps .br{grid-column:2 / -1;font-size:13px;color:var(--ink2);line-height:1.6;margin:-4px 0 4px;padding-left:10px;border-left:2px solid var(--grid)}.cad-steps .br b{font-weight:600;color:var(--ink)}.cad-steps .rem{color:var(--ink2);font-size:13px;min-width:0}.cad-det{margin-top:10px}.cad-doc{display:block;margin:14px 2px 0;font-size:13px;color:var(--ink2)}.cad-det summary{font-size:13px;color:var(--ink2);cursor:pointer}.cad-res .ln.warn{color:var(--trend)}table.cad-t{width:100%;border-collapse:collapse;margin-top:12px;font-size:13px;font-variant-numeric:tabular-nums}table.cad-t th{font-weight:400;color:var(--muted);text-align:right;padding:4px 4px;border-bottom:1px solid var(--axis)}table.cad-t td{text-align:right;padding:6px 4px;border-bottom:1px solid var(--grid)}table.cad-t th:first-child,table.cad-t td:first-child{text-align:left}table.cad-t tr.on td{font-weight:600}@media(min-width:900px){.cad-wrap{display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:20px;align-items:start}}.pmeta{margin:28px 0 0;color:var(--muted);font-size:11px;text-align:center}section.solo>h2{display:none}
 nav{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 8px}
 nav a{font-size:13px;color:var(--ink2);text-decoration:none;border:1px solid var(--border);border-radius:999px;padding:4px 12px;background:var(--surface)}
 nav a:hover{color:var(--ink)}
@@ -1384,6 +1422,7 @@ DRAW.caddie = (sec, host) => {
     const total = cum[cum.length - 1], at = sy => { const v = Math.max(0, Math.min(total, sy)); for (let i = 1; i < pts.length; i++) if (v <= cum[i]) { const f = (v - cum[i - 1]) / (cum[i] - cum[i - 1] || 1); return [pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * f, pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * f]; } return pts[pts.length - 1]; };
     const proj = pt => { let best = { dist: 1e9, s: 0 }; for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], b = pts[i], vx = b[0] - a[0], vy = b[1] - a[1], t = Math.max(0, Math.min(1, ((pt[0] - a[0]) * vx + (pt[1] - a[1]) * vy) / (vx * vx + vy * vy || 1))), dd = Math.hypot(pt[0] - a[0] - t * vx, pt[1] - a[1] - t * vy) * H.k; if (dd < best.dist) best = { dist: dd, s: cum[i - 1] + t * (cum[i] - cum[i - 1]) }; } return best; };
     return { pts, cum, total, at, proj }; };
+  const latOf = (club, adv) => M.lat[club] || M.latr.map(v => Math.round(v * adv));
   const pick = (d, l) => { const list = evaluate(d, l); if (!list.length) return null; let b = list[0]; const s2 = list[1]; if (s2 && s2.exp - b.exp < Math.hypot(b.se, s2.se) && s2.n >= 3 * b.n) b = s2; return { b, list }; };
   const route = (d, l) => { const steps = []; let cd = d, cl = l;
     for (let n = 0; n < 6 && cd > 0 && cl !== "G"; n++) { if (cd <= 15) { steps.push({ club: "A杆", from: cd, adv: cd, left: 0, on: true, chance: false, r: (pick(cd, cl) || {}).b || { exp: 1 + M.green, se: 0, lo: 0, hi: cd, med: cd }, list: [] }); break; }
@@ -1408,8 +1447,9 @@ DRAW.caddie = (sec, host) => {
     const sux = (H.pin[0] - pos[0]) / (straight / H.k || 1), suy = (H.pin[1] - pos[1]) / (straight / H.k || 1), at = yd => onPath ? P.at(pj.s + Math.max(0, yd - pj.dist)) : [pos[0] + sux * yd / H.k, pos[1] + suy * yd / H.k];
     if (d > 0) { const line = onPath ? [pos, ...Array.from({ length: 41 }, (_, i) => P.at(pj.s + (P.total - pj.s) * i / 40))] : [pos, H.pin];
       el("polyline", { points: line.map(q2 => q2.map(v => v.toFixed(1)).join(",")).join(" "), fill: "none", stroke: "#fff", "stroke-width": 1.2 * k, "stroke-dasharray": `${4 * k} ${4 * k}`, "stroke-opacity": 0.8 }, svg);
-      if (best && !first.on) { const a = at(Math.min(best.lo, d)), b = at(Math.min(best.hi, d)); el("line", { x1: a[0], y1: a[1], x2: b[0], y2: b[1], stroke: "#ffd23f", "stroke-width": 9 * k, "stroke-opacity": 0.4, "stroke-linecap": "round" }, svg); }
-      let cum = 0; steps.forEach((st, n) => { if (st.on) return; cum += st.adv; const m = at(cum); el("circle", { cx: m[0], cy: m[1], r: 7 * k, fill: "#ffd23f", stroke: "#111", "stroke-width": k }, svg); el("text", { x: m[0], y: m[1] + 3.6 * k, "text-anchor": "middle", "font-size": 10 * k, "font-weight": 700, fill: "#111" }, svg, n + 1); }); }
+      let cum = 0; steps.forEach((st, n) => { if (st.on) return; const base = cum, lt = latOf(st.club, st.adv), lo = Math.min(st.r.lo, st.from), hi = Math.min(st.r.hi, st.from), c0 = at(base + (lo + hi) / 2), c1 = at(base + (lo + hi) / 2 + 4), tl = Math.hypot(c1[0] - c0[0], c1[1] - c0[1]) || 1, tx = (c1[0] - c0[0]) / tl, ty = (c1[1] - c0[1]) / tl, rx = -ty, ry = tx, off = (lt[0] + lt[2]) / 2 / H.k;
+        el("ellipse", { cx: c0[0] + rx * off, cy: c0[1] + ry * off, rx: Math.max(6, (hi - lo) / 2) / H.k, ry: Math.max(6, (lt[2] - lt[0]) / 2) / H.k, transform: `rotate(${Math.atan2(ty, tx) * 180 / Math.PI} ${c0[0] + rx * off} ${c0[1] + ry * off})`, fill: "#ffd23f", "fill-opacity": 0.28, stroke: "#ffd23f", "stroke-width": 1.2 * k, "stroke-opacity": 0.9 }, svg);
+        cum += st.adv; const m0 = at(cum), m = [m0[0] + rx * lt[1] / H.k, m0[1] + ry * lt[1] / H.k]; el("circle", { cx: m[0], cy: m[1], r: 7 * k, fill: "#ffd23f", stroke: "#111", "stroke-width": k }, svg); el("text", { x: m[0], y: m[1] + 3.6 * k, "text-anchor": "middle", "font-size": 10 * k, "font-weight": 700, fill: "#111" }, svg, n + 1); }); }
     { const [px, py] = H.pin; el("line", { x1: px, y1: py, x2: px, y2: py - 16 * k, stroke: "#fff", "stroke-width": 1.5 * k }, svg); el("polygon", { points: `${px},${py - 16 * k} ${px + 9 * k},${py - 12.5 * k} ${px},${py - 9 * k}`, fill: "#ff3b3b" }, svg); }
     el("circle", { cx: pos[0], cy: pos[1], r: 6 * k, fill: "#fff", stroke: "#111", "stroke-width": 1.6 * k }, svg); el("circle", { cx: pos[0], cy: pos[1], r: 2.4 * k, fill: "#e03131" }, svg);
     svg.addEventListener("click", e => { const p = svg.createSVGPoint(); p.x = e.clientX; p.y = e.clientY; const t = p.matrixTransform(svg.getScreenCTM().inverse()); pos = [Math.round(t.x), Math.round(t.y)]; lieAuto = true; draw(); });
@@ -1423,7 +1463,9 @@ DRAW.caddie = (sec, host) => {
     const used = (pos[0] === H.tee[0] && pos[1] === H.tee[1]) ? 0 : null, total = steps.length + 2, dv = used === 0 ? total - H.par : null, nm = dv == null ? "" : dv <= -1 ? "Birdie" : dv === 0 ? "Par" : dv === 1 ? "Bogey" : dv === 2 ? "Double" : "+" + dv;
     const parts = []; let prevChance = false; steps.forEach((st, n) => { const act = st.on ? (st.from <= 80 ? "切上果嶺" : "上果嶺") : ` ${st.adv} 碼`; parts.push((prevChance ? "不順利再用 " : n ? "接 " : "") + st.club + (st.on && prevChance ? " 切上去" : act) + (st.chance ? "，順利的話直接上果嶺" : "")); prevChance = st.chance; });
     lastSay = `${d} 碼。${parts.join("，")}，兩推` + (used === 0 ? `，${total} 桿 ${nm}。` : `，再 ${total} 桿進洞。`); h("div", "cad-say", res, lastSay);
-    const grid = h("div", "cad-steps", res); steps.forEach((st, n) => { h("i", "", grid, n + 1); h("b", "", grid, st.club); h("span", "", grid, st.on ? "上果嶺" : `${st.adv} 碼`); h("span", "rem", grid, st.on ? "" : `剩 ${st.left}` + (st.chance ? "・打得好可上果嶺" : "")); });
+    const grid = h("div", "cad-steps", res); steps.forEach((st, n) => { h("i", "", grid, n + 1); h("b", "", grid, st.club); h("span", "", grid, st.on ? "上果嶺" : `${st.adv} 碼`); const lt = st.on ? null : latOf(st.club, st.adv); h("span", "rem", grid, st.on ? "" : `剩 ${st.left}` + (lt && Math.abs(lt[1]) >= 5 ? `・常偏${lt[1] > 0 ? "右" : "左"} ${Math.abs(lt[1])} 碼` : ""));
+      if (!st.on) { const br = h("div", "br", grid), alt = (label, adv, l2) => { const rem = Math.max(0, Math.round(st.from - adv)), ln = h("div", "", br); if (rem <= 12) { ln.innerHTML = `<b>${label}</b> ${adv} 碼：上果嶺`; return; } const nx = route(rem, l2); ln.innerHTML = `<b>${label}</b> ${adv} 碼：剩 ${rem}，接 ${nx.length ? nx[0].club : "A杆"}` + (nx.length ? `（再 ${nx.length + 2} 桿）` : ""); };
+        alt("打得好", Math.min(st.r.hi, st.from), "F"); alt("打不好", Math.min(st.r.lo, st.from), "R"); } });
     h("i", "pt", grid, "推"); h("b", "", grid, "推桿"); h("span", "", grid, "兩推"); h("span", "rem", grid, "");
     h("div", "ln", res).innerHTML = (used === 0 ? `照常態打 <b>${total}</b> 桿（<b>${nm}</b>）` : `照常態打再 <b>${total}</b> 桿`) + `・你從這裡平均 <b>${best.exp.toFixed(1)}</b> 桿`;
     const hz = hazards(pos, H, geo, d, first.on ? H.pin : at(best.med)); if (hz.length) h("div", "ln", res).innerHTML = "前方：" + hz.slice(0, 3).map(z => `${z.name} <b>${z.along}</b> 碼${z.side}` + (!first.on && z.along >= best.lo - 5 && z.along <= best.hi + 5 ? "（這一桿會到）" : "")).join("、");
