@@ -875,7 +875,7 @@ nav{margin:10px 0 0}nav a{font-size:12px;padding:3px 10px}
 .rmonth{font-size:12px;color:var(--muted);padding:6px 4px;position:sticky;top:0;background:var(--surface);z-index:5}
 .rcard{border:1px solid var(--border);border-radius:14px;padding:12px 14px 10px;margin-bottom:10px;background:var(--page);cursor:pointer;outline:none}.rcard:hover,.rcard:focus-visible{border-color:var(--axis)}.rcard.on{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
 .rc1{display:flex;justify-content:space-between;align-items:center;gap:10px}.rttl{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px;min-width:0}.rdate{font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums}.rname{font-size:19px;font-weight:700;line-height:1.25}.rsub{font-size:12px;color:var(--muted)}
-.rtot{white-space:nowrap;line-height:1}.rtot b{font-size:36px;font-weight:700;font-variant-numeric:tabular-nums}.rttl{flex:1}.rstk{flex:none;font-size:12px;color:var(--muted);line-height:1.45;white-space:nowrap;font-variant-numeric:tabular-nums}.rstk b{font-size:15px;color:var(--ink)}.rstk:last-child{min-width:54px}
+.rtot{white-space:nowrap;line-height:1}.rtot b{font-size:36px;font-weight:700;font-variant-numeric:tabular-nums}.rttl{flex:1}.rstk{flex:none;font-size:12px;color:var(--muted);line-height:1.45;white-space:nowrap;font-variant-numeric:tabular-nums}.rstk b{font-size:15px;color:var(--ink)}.rstk{text-align:right}.rtot{min-width:70px;text-align:right}
 .rc2{display:flex;gap:18px;margin-top:2px;font-size:13px;color:var(--muted)}.rc2 b{font-size:16px;color:var(--ink);font-variant-numeric:tabular-nums}.rcard b.ok{color:var(--up)}
 .rbars{display:flex;gap:3px;align-items:flex-end;height:46px;padding-bottom:8px;margin-top:6px;box-sizing:border-box}.rbars i,.rdots i{flex:1;display:block;min-width:0}.rbars i.gap,.rdots i.gap{margin-left:9px}
 .rbars i{border-radius:2px 2px 0 0}.rbars i.p,.rlg i.p{background:var(--up);height:4px}.rbars i.g,.rlg i.g{background:var(--muted)}.rbars i.d,.rlg i.d{background:#ef9f27}.rbars i.x,.rlg i.x{background:var(--down)}.rbars i.b{background:var(--series);height:8px;margin-bottom:-8px;border-radius:0 0 2px 2px}.rlg i.b{background:var(--series)}
@@ -1336,8 +1336,8 @@ DRAW.roundlist = (sec, host) => {
     const top = h("div", "rc1", c), L = h("div", "rttl", top); h("span", "rdate", L, (r.date.slice(0, 4) !== String(new Date().getFullYear()) ? r.date.slice(2, 4) + "/" : "") + r.date.slice(5).replace("-", "/")); h("span", "rname", L, r.short);
     [r.tag, r.n !== 18 ? r.n + " 洞" : ""].filter(Boolean).forEach(x => h("span", "rsub", L, x));
     const stat = (box, k, v, ok, ic) => { const d = h("div", "", box); if (ic) h("i", ic, d); h("span", "", d, k + " "); h("b", ok ? "ok" : "", d, v == null ? "—" : v); };
-    const R = h("div", "rtot", top); h("b", full(r) && T.score && r.strokes <= T.score ? "ok" : "", R, r.strokes);
     const s2 = h("div", "rstk", top); stat(s2, "推桿", r.putts, full(r) && r.putts != null && r.putts <= T.putts); h("div", "", s2, (r.over > 0 ? "+" : "") + r.over);
+    const R = h("div", "rtot", top); h("b", full(r) && T.score && r.strokes <= T.score ? "ok" : "", R, r.strokes);
     const bars = h("div", "rbars", c), dots = h("div", "rdots", c);
     r.holes.forEach((x, i) => { const g = i && i % 9 === 0 ? " gap" : "", dv = x[6] - x[1], b = h("i", lvl(dv) + g, bars); if (dv > 0) b.style.height = Math.min(4 + dv * 10, 36) + "px"; h("i", (x[4] >= 3 ? "d" : "") + g, dots); });
     const ft = h("div", "rsum", c), two = r.holes.length > 9 && r.holes.length <= 18, sub = i => { const part = r.holes.slice(i, i + 9), sp = h("span", "rs", ft, (r.parts && r.parts[i] ? r.parts[i] : i === 0 ? "前九" : "後九") + " "); h("b", "", sp, part.reduce((a, x) => a + x[6], 0)); };
