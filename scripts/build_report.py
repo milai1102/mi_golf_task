@@ -642,7 +642,7 @@ def section_plan(con):
     return {"id": "plan", "title": "訓練計劃", "note": note, "kind": "plan", "data": data, "table": {"head": [], "rows": []}}
 
 def section_roundlist(con):
-    tags = {"short_course": "短球場", "partial": "未打完", "nine": "9 洞"}; out = []
+    tags = {"short_course": "小九洞", "partial": "未完成", "nine": "9 洞"}; out = []
     CLUBS = ["一號木桿", "鐵木桿", "6鐵", "7鐵", "8鐵", "9鐵", "P杆"]      # 「各桿距離」只列全揮桿的球桿
     order = [r[0] for r in con.execute("SELECT round_id FROM rounds WHERE category != 'short_course' ORDER BY date")]
     dist = {}
@@ -1225,7 +1225,7 @@ DRAW.courses = (sec, host) => {
 };
 
 DRAW.roundlist = (sec, host) => {
-  const cats = [["full", "完整 18 洞", true], ["partial", "未打完", false], ["short", "短球場", false]];
+  const cats = [["full", "完整", true], ["short", "小九洞", false], ["partial", "未完成", false]];
   const on = Object.fromEntries(cats.map(c => [c[0], c[2]])); let all = false;
 
   // 計分卡：一眼看出每一洞的結果。框的畫法照一般計分卡：圓圈 Birdie、單框 Bogey、雙框 Double、+3 以上塗滿；下面的點是推桿數
