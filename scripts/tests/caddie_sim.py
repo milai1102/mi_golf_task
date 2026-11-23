@@ -36,7 +36,7 @@ async def run(day, holes, br):
     await pg.goto("http://localhost:8765/reports/caddie.html"); await pg.wait_for_timeout(700)
     state = lambda: pg.evaluate("""(()=>{const q=s=>document.querySelector(s),sl=document.querySelectorAll('.cad-top select')[1];return {c:document.querySelectorAll('.cad-top select')[0].selectedOptions[0].textContent,l:sl&&sl.style.display!=='none'?sl.selectedOptions[0].textContent:'',h:+q('.cad-holes .on').textContent,msg:q('.cad-msg').textContent,row:[...document.querySelectorAll('.cad-next button')].map(b=>b.textContent),sg:(q('.cad-next button.sg')||{}).textContent||'',live:q('.cad-here').classList.contains('live')}})()""")
     issues = []; n_shots = 0; n_ok_hole = 0; sugsame = 0; subst = 0
-    owe = None; clock = [0]; t0 = [0]
+    owe = None; clock = [0]; t0 = [0]; hints = []
     async def fill(H0):
         on = min(9, max(1, len(H0['shots'])))
         await pg.locator(".cad-sheet .nums").nth(0).get_by_text(str(on), exact=True).click(); await pg.locator(".cad-sheet .nums").nth(1).get_by_text("2", exact=True).click(); await pg.locator(".cad-sheet .nums").nth(2).get_by_text("5", exact=True).click()
@@ -51,6 +51,9 @@ async def run(day, holes, br):
             if reload_mode: await pg.reload(); await pg.wait_for_timeout(1200)
             else: await pg.wait_for_timeout(1000)
             st = await state(); n_shots += 1
+            if (st['l'], st['h']) != want:
+                hb = pg.locator(".cad-msg .cad-undo", has_text=f"切到第 {H['h']} 洞")
+                if await hb.count(): await hb.click(); await pg.wait_for_timeout(200); st = await state(); hints.append(f"{want}")
             if (st['l'], st['h']) != want or not st['c'].startswith(SHORT): issues.append(f"{day} {want} 第{i+1}桿：畫面在 {st['c']} {st['l']} {st['h']}｜{st['msg']}")
             else: n_ok_hole += 1
             if owe is not None:
@@ -87,7 +90,7 @@ async def run(day, holes, br):
         if r.get('putts') is None: issues.append(f"{day} {lab[H['cid']]}{H['h']}：成績沒記到")
     lg = json.loads(await pg.evaluate("localStorage.getItem('mi-caddie-log')") or '[]'); ev = collections.Counter(e['ev'] for e in lg)
     pxerr.sort()
-    print(f"== {day} {len(holes)} 洞 {n_shots} 桿｜洞正確 {n_ok_hole}/{n_shots}｜桿數不符的洞 {miss}｜位置誤差(碼) 中位數 {pxerr[len(pxerr)//2]:.1f} 最大 {pxerr[-1]:.1f}｜建議＝實際用的 {sugsame}/{n_shots}（球袋外改按 H：{subst}）｜上方小計：{run_txt}｜紀錄 {len(lg)} 筆 {dict(ev)}｜JS 錯誤 {errs}")
+    print(f"== {day} {len(holes)} 洞 {n_shots} 桿｜洞正確 {n_ok_hole}/{n_shots}｜桿數不符的洞 {miss}｜位置誤差(碼) 中位數 {pxerr[len(pxerr)//2]:.1f} 最大 {pxerr[-1]:.1f}｜建議＝實際用的 {sugsame}/{n_shots}（球袋外改按 H：{subst}）｜上方小計：{run_txt}｜紀錄 {len(lg)} 筆 {dict(ev)}｜要按一下才換洞 {len(hints)} 次 {hints}｜JS 錯誤 {errs}")
     for x in issues: print("   !", x)
     await ctx.close(); return len(issues)
 async def main():
