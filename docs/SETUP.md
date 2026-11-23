@@ -55,10 +55,10 @@ python3 scripts/new_user.py --yes
 2. 如果出現登入畫面：**請使用者自己登入**，等他說好了再繼續。登入後應該看得到他的計分卡清單。
 3. 告訴使用者：「接下來會下載一個檔案 `garmin_export_YYYYMMDD.json`，內容是你自己的計分卡資料，只存在你的電腦。」
 4. 讀取專案裡 `scripts/garmin_download.js` 的**完整內容**，用你的「在頁面執行 JavaScript」工具在那個分頁執行（整個檔案原封不動，當成一段程式執行）。
-5. 它每張計分卡約 1 秒。可以讀頁面的 Console 看進度（`[golf] 計分卡 5 / 40`），或過一會兒執行 `window.__GOLF_EXPORT ? window.__GOLF_EXPORT.summary.length : "還在跑"`。
+5. 它每張計分卡約 1 到 2 秒，幾十張要一兩分鐘，**可能比你的工具單次執行的時間上限還久**。這沒關係：程式是在頁面裡自己跑的，你的那次呼叫逾時或沒有回傳值都不代表失敗。每隔十幾秒執行一次 `window.__GOLF_STATUS` 看進度（例如「計分卡 25 / 40」），直到它以「完成：」開頭。不要因為逾時就重複執行整段程式。
 6. 完成時瀏覽器會自動下載 `garmin_export_YYYYMMDD.json` 到下載資料夾（通常是 `~/Downloads`）。**這個分頁先不要關、不要重新整理**，第 5 步還要用。
 
-確認成功：下載資料夾裡有 `garmin_export_YYYYMMDD.json`（幾百 KB 到幾 MB）；`window.__GOLF_EXPORT.summary.length` 是計分卡張數。
+確認成功：`window.__GOLF_STATUS` 以「完成：N 張計分卡…」開頭；下載資料夾裡有 `garmin_export_YYYYMMDD.json`（幾百 KB 到幾 MB）。
 
 出問題時：
 - Console 出現「請先登入…」：分頁不在 connect.garmin.com，或還沒登入。
@@ -112,7 +112,8 @@ __golfOpenMaps(["032501","099001"])
    - 回傳的數字是要處理幾洞；頁面會在一秒內跳到一張球洞的圖（網址是 `https://birdseye.garmin.com/…`）。
    - 如果說 `__golfOpenMaps is not defined`：分頁被重新整理過。重做第 3 步的第 4 點（再執行一次 `garmin_download.js`，會再下載一次檔案，沒關係），然後再執行這一行。
 2. 等頁面變成球洞圖之後，在**這個新頁面**執行 `scripts/garmin_course_download.js` 的完整內容。
-3. 它會自動開始，每洞約 1 到 2 秒。進度可以讀 `window.__GOLF_GEO_STATUS`（例如「處理中 12 / 27」）。
+3. 它會自動開始，每洞約 1 到 2 秒。和第 3 步一樣，你的呼叫逾時不代表失敗：每隔十幾秒讀一次 `window.__GOLF_GEO_STATUS`（例如「處理中 12 / 27」），直到它以「完成：」開頭。
+   - 如果進度一直不動：有些瀏覽器在分頁沒有顯示在畫面上時會暫停。請使用者把那個瀏覽器分頁切到前面。
 4. 顯示「完成：N 洞…已下載 course_geo_export.json」之後：
 
 ```

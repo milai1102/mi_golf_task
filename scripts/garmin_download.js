@@ -9,7 +9,7 @@
 // 只讀取資料，不會修改 Garmin 上的任何東西；資料只存在你的電腦裡。模擬場次（SIMULATION）不下載。
 // 已經匯入過的計分卡不用特別排除：ingest_export.py 會自動略過重複的。
 (async () => {
-  const say = (m) => console.log('%c[golf] ' + m, 'color:#0a7;font-weight:bold');
+  const say = (m) => { window.__GOLF_STATUS = m; console.log('%c[golf] ' + m, 'color:#0a7;font-weight:bold'); };
   const meta = document.querySelector('meta[name="csrf-token"]');
   if (!location.hostname.endsWith('connect.garmin.com') || !meta) { console.error('[golf] 請先登入 https://connect.garmin.com/app/scorecards ，在那個分頁的 Console 執行。'); return; }
   const B = '/golf-api/gcs-golfcommunity/api/v2';
@@ -78,5 +78,5 @@
       const keys = Object.keys(pick); if (!keys.length) { console.error('[golf] 這些球場代碼在這次下載的資料裡沒有地圖網址：' + JSON.stringify(cids)); return 0; }
       const url = pick[keys[0]] + '#golf=' + btoa(unescape(encodeURIComponent(JSON.stringify(pick)))); setTimeout(() => { location.href = url; }, 300); return keys.length; };
     say('要球洞圖：在這個分頁執行 __golfOpenMaps(["球場代碼", …])（代碼由 python3 scripts/check_setup.py 列出；不給參數＝全部），頁面會跳到一張球洞圖，再在那一頁執行 scripts/garmin_course_download.js。');
-  } catch (e) { console.error('[golf] 失敗：' + e + '。常見原因：沒登入、登入過期（重新整理頁面再試）、Garmin 改版。'); }
+  } catch (e) { window.__GOLF_STATUS = '失敗：' + e; console.error('[golf] 失敗：' + e + '。常見原因：沒登入、登入過期（重新整理頁面再試）、Garmin 改版。'); }
 })();
