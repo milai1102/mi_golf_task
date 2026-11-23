@@ -2,6 +2,11 @@
 
 資料來源：Garmin Fenix 8 → Garmin Connect。目標是跨場次看趨勢，制定系統性的進攻與選桿策略。
 
+## 想用你自己的資料？
+
+這是開源專案，歡迎拿去用。下載之後裡面是原作者的資料；要換成你自己的 Garmin 資料，照 **[docs/SETUP.md](docs/SETUP.md)** 一步一步做（大約 20 分鐘，不需要安裝任何套件）。
+請 AI 幫你操作的話，叫它先讀 `AGENTS.md` 和 `docs/SETUP.md`，並隨時執行 `python3 scripts/check_setup.py` 看下一步。
+
 ## 目錄說明
 
 | 目錄 | 用途 |

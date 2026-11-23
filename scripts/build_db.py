@@ -3,11 +3,12 @@
 資料庫是衍生物，隨時可刪掉重建；任何修正都改 data/rounds 的檔案，不要改資料庫。
 用法：python3 scripts/build_db.py
 """
-import csv, glob, os, shutil, sqlite3, tempfile
+import csv, glob, json, os, shutil, sqlite3, tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ROUNDS, OUT = os.path.join(ROOT, "data/rounds"), os.path.join(ROOT, "data/processed")
-SHORT_COURSES = {"台灣中油高爾夫球場"}   # 短球場，獨立一類
+_cfg = os.path.join(ROOT, "data/config.json")
+SHORT_COURSES = set(json.load(open(_cfg, encoding="utf-8")).get("short_courses", [])) if os.path.exists(_cfg) else set()   # 短球場，獨立一類（data/config.json）
 YD = 1.09361
 n = lambda v: None if v in ("", None) else int(float(v))
 HOLE_CAP = 4      # 算差點時每洞最多算到標準桿 +4（正式規則是「淨 Double Bogey」，需要各洞難度排序，這裡用 +4 近似）

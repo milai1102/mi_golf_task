@@ -8,6 +8,11 @@ import csv, datetime, glob, json, os, shutil, sqlite3, statistics, tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB, OUT = os.path.join(ROOT, "data/processed/golf.db"), os.path.join(ROOT, "reports/index.html")
+# 個人設定（球桿名稱、球袋、簡寫、短球場、要不要訓練計劃頁）：data/config.json。新使用者用 scripts/setup_config.py 從自己的資料產生，見 docs/SETUP.md
+CFG = json.load(open(os.path.join(ROOT, "data/config.json"), encoding="utf-8")) if os.path.exists(os.path.join(ROOT, "data/config.json")) else {}
+_C = CFG.get("clubs", {})
+DRIVER, FAIRWAY, CHIP_CLUB, SAND_CLUB = _C.get("driver", "Driver"), _C.get("fairway", ""), _C.get("chip", ""), _C.get("sand", "")
+WOODS = set(CFG.get("woods", [])); ABBR = CFG.get("abbr", {}); SITE_TITLE = CFG.get("site_title", "高爾夫數據"); PLAN_ON = bool(CFG.get("plan", False))
 MIN_N = 10        # 樣本少於此數的球桿不畫
 SUCCESS = 0.9     # 成功：打到該桿眾數的 90% 以上（整頁統一用 90%，色條也涵蓋 90% 的球）
 
@@ -386,7 +391,7 @@ def section_mishit_trend(con):
             "opts": {"unit": "%", "step": 5, "plain": True}}
 
 def section_mishit_club(con):
-    groups = {"一號木桿": "一號木桿", "鐵木桿": "鐵木桿"}; rows_lbl = ["一號木桿", "鐵木桿", "7 鐵到 P 桿"]
+    groups = {DRIVER: "一號木桿", FAIRWAY: "鐵木桿"}; rows_lbl = ["一號木桿", "鐵木桿", "7 鐵到 P 桿"]
     quarter = lambda d: f"{d[:4]} Q{(int(d[5:7]) - 1) // 3 + 1}"
     by = {}
     for rid, date, course, club, yd, bad in full_swing_shots(con):
@@ -543,7 +548,7 @@ def round_gps(fname):
             elif c[0] and cur is not None:
                 s, e = c[4].split(","), c[5].split(",")
                 if not s[2] or not e[2]: continue
-                club = c[1]; cat = "d" if club == "一號木桿" else "c" if roles.get(club) == "chip" else "w" if "木" in club else "i"
+                club = c[1]; cat = "d" if club == DRIVER else "c" if roles.get(club) == "chip" else "w" if (club in WOODS or "木" in club) else "i"
                 sp, ep = (int(s[2]), int(s[3])), (int(e[2]), int(e[3])); yd = round(int(c[3]) * 1.09361)
                 cur["shots"].append([club, cat, sp[0], sp[1], ep[0], ep[1], yd, e[4]])
                 if cat == "d" and int(c[0]) == 1:                                   # 只算開球那一桿
@@ -596,7 +601,7 @@ def section_courses(con):
 
 # ---- 訓練計劃（第四個頁籤）：目標與計劃的文字在這裡改，數字由資料算出 ----
 # ---------------------------------------------------------------- AI 桿弟：攻略引擎的資料（模擬器用）
-CADDIE_BAG = ["一號木桿", "鐵木桿", "6鐵", "8鐵", "P杆", "A杆", "54度"]     # 一號木只在發球台、54 度只在沙坑（JS 端判斷）
+CADDIE_BAG = CFG.get("bag", [])     # 一號木只在發球台、54 度只在沙坑（JS 端判斷）
 CADDIE_EDGES = [0, 10, 20, 30, 40, 60, 80, 100, 125, 150, 175, 200, 250, 300, 350, 400, 450, 700]   # 離旗桿（碼）的分組
 CADDIE_LIE = {"TeeBox": "T", "Fairway": "F", "Rough": "R", "Unknown": "R", "Bunker": "B", "Waste": "B", "Green": "G"}
 
@@ -812,11 +817,11 @@ def section_plan(con):
     bag = []
     for club, use in PLAN_BAG:
         d = med_all(club)
-        bag.append({"club": club, "use": use, "chip": club == "A杆", "n": len(d), "med": d[(len(d) - 1) // 2] if d else None, "good": d[int((len(d) - 1) * .75)] if d else None})
-    hy = [x[0] for x in con.execute(f"SELECT distance_yd FROM shots WHERE club='鐵木桿' AND distance_yd IS NOT NULL AND round_id IN ({q})", ids)]
-    hmed = next(b["med"] for b in bag if b["club"] == "鐵木桿")
+        bag.append({"club": club, "use": use, "chip": club == CHIP_CLUB, "n": len(d), "med": d[(len(d) - 1) // 2] if d else None, "good": d[int((len(d) - 1) * .75)] if d else None})
+    hy = [x[0] for x in con.execute(f"SELECT distance_yd FROM shots WHERE club=? AND distance_yd IS NOT NULL AND round_id IN ({q})", [FAIRWAY] + ids)]
+    hmed = next(b["med"] for b in bag if b["club"] == FAIRWAY)
     facts = {"three": avg("three", base), "hy_n": round(len(hy) / max(1, len(ids)), 1), "hy_bad": round(100 * sum(x < MISHIT_RATIO * hmed for x in hy) / max(1, len(hy)))}
-    dr = con.execute(f"SELECT s.distance_yd, h.fairway FROM shots s JOIN holes h USING(round_id, seq) WHERE s.club='一號木桿' AND s.shot_no=1 AND s.distance_yd IS NOT NULL AND s.round_id IN ({q})", ids).fetchall()
+    dr = con.execute(f"SELECT s.distance_yd, h.fairway FROM shots s JOIN holes h USING(round_id, seq) WHERE s.club=? AND s.shot_no=1 AND s.distance_yd IS NOT NULL AND s.round_id IN ({q})", [DRIVER] + ids).fetchall()
     dd = sorted(x[0] for x in dr); pct = lambda k, n: round(100 * k / max(1, n))
     ch = con.execute(f"""SELECT s.to_pin_start_m*1.09361, s.end_lie, s.to_pin_end_m,
         (SELECT COUNT(*) FROM shots t WHERE t.round_id=s.round_id AND t.seq=s.seq AND t.shot_type!='PUTT' AND t.shot_no>s.shot_no)
@@ -835,7 +840,7 @@ def section_plan(con):
 
 def section_roundlist(con):
     tags = {"short_course": "小九洞", "partial": "未完成", "nine": "9 洞"}; out = []
-    CLUBS = ["一號木桿", "鐵木桿", "6鐵", "7鐵", "8鐵", "9鐵", "P杆"]      # 「各桿距離」只列全揮桿的球桿
+    CLUBS = CFG.get("full_clubs", [])      # 「各桿距離」只列全揮桿的球桿
     order = [r[0] for r in con.execute("SELECT round_id FROM rounds WHERE category != 'short_course' ORDER BY date")]
     dist = {}
     for rid_, club_, yd_ in con.execute("SELECT round_id, club, distance_yd FROM shots WHERE distance_yd IS NOT NULL AND shot_type != 'PUTT'"): dist.setdefault((rid_, club_), []).append(yd_)
@@ -985,7 +990,7 @@ MORE = [section_putt_holes, section_club_recent, stacked(section_seq_cost), with
 
 PAGE = r"""<!DOCTYPE html>
 <html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MI 高爾夫數據</title>
+<title>__TITLE__</title>
 <script>try{var t=localStorage.getItem("mi-theme");if(t==="dark"||t==="light")document.documentElement.dataset.theme=t}catch(e){}</script>
 <style>
 :root{color-scheme:light;--surface:#fcfcfb;--page:#f4f3ef;--ink:#0b0b0b;--ink2:#52514e;--muted:#898781;--grid:#e1e0d9;--axis:#c3c2b7;--border:rgba(11,11,11,.10);--series:#2a78d6;--trend:#eb6834;--up:#0c8a0c;--down:#d03b3b;--putt:#1baf7a}
@@ -1419,7 +1424,7 @@ DRAW.courses = (sec, host) => {
   draw();
 };
 
-DRAW.caddie = (sec, host) => {
+DRAW.caddie = (sec, host) => { const CL = REPORT.clubs || {};
   const M = sec.model, LIEZH = { T: "發球台", F: "球道", R: "長草", B: "沙坑", G: "果嶺", W: "水" };
   let ci = 0, li = 0, hi = 0, pos = null, lie = "T", lieAuto = true;
   const gpsRow = h("div", "cad-gps", host), gpsBtn = h("button", "cad-here", gpsRow, "我在這裡，怎麼打？"), gpsMsg = h("span", "cad-msg", gpsRow); let lastSay = "";
@@ -1444,7 +1449,7 @@ DRAW.caddie = (sec, host) => {
     const n = rows.length, mean = rows.reduce((a, r) => a + r.v, 0) / n, sd = Math.sqrt(rows.reduce((a, r) => a + (r.v - mean) ** 2, 0) / Math.max(1, n - 1));
     const adv = rows.map(r => r.adv).sort((a, b) => a - b), end = rows.map(r => r.end).sort((a, b) => a - b);
     const tabSe = rows.reduce((a, r) => a + r.e, 0) / n; return { club, mode, n, exp: 1 + mean, se: Math.hypot(sd / Math.sqrt(n), tabSe), lo: q(adv, 0.1), med: q(adv, 0.5), hi: q(adv, 0.9), left: q(end, 0.5), green: rows.filter(r => r.g).length / n, lieAll: pool === S }; };
-  const evaluate = (d, l) => M.bag.filter(c => (c !== "一號木桿" || (l === "T" && d >= 230)) && (c !== "54度" || l === "B")).map(c => evalClub(c, d, l === "W" ? "R" : l)).filter(Boolean).sort((a, b) => a.exp - b.exp);
+  const evaluate = (d, l) => M.bag.filter(c => (c !== CL.driver || (l === "T" && d >= 230)) && (c !== CL.sand || CL.sand === CL.chip || l === "B")).map(c => evalClub(c, d, l === "W" ? "R" : l)).filter(Boolean).sort((a, b) => a.exp - b.exp);
   const pathOf = (H, geo) => { const L = Math.hypot(H.pin[0] - H.tee[0], H.pin[1] - H.tee[1]) || 1, ux = (H.pin[0] - H.tee[0]) / L, uy = (H.pin[1] - H.tee[1]) / L, Ly = L * H.k, bins = {};
     (geo.fairway || []).forEach(poly => { const xs = poly.map(q2 => q2[0]), ys = poly.map(q2 => q2[1]), x1 = Math.min(...xs), x2 = Math.max(...xs), y1 = Math.min(...ys), y2 = Math.max(...ys);
       for (let x = x1; x <= x2; x += 5) for (let y = y1; y <= y2; y += 5) { const dx = x - H.tee[0], dy = y - H.tee[1], t = (dx * ux + dy * uy) * H.k, lat = (dx * uy - dy * ux) * H.k; if (t < 70 || t > Ly - 40 || Math.abs(lat) > 70 || !inside([x, y], poly)) continue; const b = Math.floor(t / 40); (bins[b] = bins[b] || []).push([x, y]); } });
@@ -1457,10 +1462,10 @@ DRAW.caddie = (sec, host) => {
   const latOf = (club, adv) => M.lat[club] || M.latr.map(v => Math.round(v * adv));
   const pick = (d, l) => { const list = evaluate(d, l); if (!list.length) return null; let b = list[0]; const s2 = list[1]; if (s2 && s2.exp - b.exp < Math.hypot(b.se, s2.se) && s2.n >= 3 * b.n) b = s2; return { b, list }; };
   const route = (d, l) => { const steps = []; let cd = d, cl = l;
-    for (let n = 0; n < 6 && cd > 0 && cl !== "G"; n++) { if (cd <= 15) { steps.push({ club: "A杆", from: cd, adv: cd, left: 0, on: true, chance: false, r: (pick(cd, cl) || {}).b || { exp: 1 + M.green, se: 0, lo: 0, hi: cd, med: cd }, list: [] }); break; }
+    for (let n = 0; n < 6 && cd > 0 && cl !== "G"; n++) { if (cd <= 15) { steps.push({ club: CL.chip, from: cd, adv: cd, left: 0, on: true, chance: false, r: (pick(cd, cl) || {}).b || { exp: 1 + M.green, se: 0, lo: 0, hi: cd, med: cd }, list: [] }); break; }
       const p = pick(cd, cl); if (!p) break; const r = p.b; let left, on; if (r.mode === "near") { on = r.green >= 0.5 || r.left <= 12; left = on ? 0 : r.left; } else { left = Math.abs(cd - r.med); on = left <= 12; if (on) left = 0; }
       if (!on && left >= cd) break; steps.push({ club: r.club, from: cd, adv: cd - left, left, on, chance: !on && cd <= r.hi + 5, r, list: p.list }); cd = left; cl = on ? "G" : "F"; }
-    if (steps.length && !steps[steps.length - 1].on && steps.length < 6) steps.push({ club: "A杆", from: cd, adv: cd, left: 0, on: true, chance: false, r: steps[0].r, list: [] });
+    if (steps.length && !steps[steps.length - 1].on && steps.length < 6) steps.push({ club: CL.chip, from: cd, adv: cd, left: 0, on: true, chance: false, r: steps[0].r, list: [] });
     return steps; };
   const inside = (pt, poly) => { let ins = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [x1, y1] = poly[i], [x2, y2] = poly[j]; if ((y1 > pt[1]) !== (y2 > pt[1]) && pt[0] < (x2 - x1) * (pt[1] - y1) / (y2 - y1) + x1) ins = !ins; } return ins; };
   const cur = () => { const C = sec.data[ci], L = C.layouts[li] || C.layouts[0], H = L.holes[hi] || L.holes[0]; return { C, L, H, geo: (REPORT.geo[L.cid] || {})[H.h] || {} }; };
@@ -1480,12 +1485,12 @@ DRAW.caddie = (sec, host) => {
     const E = []; { let cum = 0; steps.forEach((st, n) => { if (st.on) return; const lt = latOf(st.club, st.adv), lo = Math.min(st.r.lo, st.from), hi = Math.min(st.r.hi, st.from), c0 = at(cum + (lo + hi) / 2), c1 = at(cum + (lo + hi) / 2 + 4), tl = Math.hypot(c1[0] - c0[0], c1[1] - c0[1]) || 1, tx = (c1[0] - c0[0]) / tl, ty = (c1[1] - c0[1]) / tl, rx = -ty, ry = tx, off = (lt[0] + lt[2]) / 2 / H.k, a = Math.max(6, (hi - lo) / 2) / H.k, b = Math.max(6, (lt[2] - lt[0]) / 2) / H.k;
       const mid = at(cum + st.adv / 2); cum += st.adv; const m0 = at(cum); E.push({ n, st, lo, hi, mid, cx: c0[0] + rx * off, cy: c0[1] + ry * off, a, b, ang: Math.atan2(ty, tx) * 180 / Math.PI, xh: Math.hypot(a * tx, b * ty), m: [m0[0] + rx * lt[1] / H.k, m0[1] + ry * lt[1] / H.k] }); }); }
     const tee0 = pos[0] === H.tee[0] && pos[1] === H.tee[1], tot = steps.length + 2, dv0 = tot - H.par, nm0 = dv0 <= -1 ? "Birdie" : dv0 === 0 ? "Par" : dv0 === 1 ? "Bogey" : dv0 === 2 ? "Double" : "+" + dv0, labs = [];
-    const AB2 = { "一號木桿": "1W", "三號木杆": "3W", "鐵木桿": "H", "P杆": "P", "A杆": "A", "54度": "54°" }, ab = cl => AB2[cl] || cl.replace("鐵", "i");
+    const ab = cl => (REPORT.abbr || {})[cl] || cl.replace("鐵", "i");
     E.forEach(e => labs.push({ y: e.mid[1], ax: e.mid[0], ab: ab(e.st.club), big: e.st.adv, hgt: 30, wpx: 84 }));
     { let cum = 0; steps.forEach(st => { if (st.on) { const q = at(cum + st.from / 2); labs.push({ y: q[1], ax: q[0], ab: ab(st.club), big: Math.round(st.from), hgt: 30, wpx: 70 }); } else cum += st.adv; }); }
     labs.push({ y: pos[1], ax: pos[0] - 6 * u0, big: `${d} 碼`, small: tee0 ? `Par ${H.par}` : LIEZH[lie], hgt: 44, wpx: 100, ball: 1 });
     const exL = Math.max(0, ...labs.map(l => (l.wpx + 10) * u0 - (l.ax - x0))), vw0 = w + exL, vw = Math.max(vw0, hh * cw / ch), vx0 = x0 - exL - (vw - vw0) / 2, u = Math.max(hh / ch, vw / cw), k = 1.35 * u;
-    labs.push({ y: y0 + 26 * u, tot: 1, big: lie === "G" ? "兩推" : !steps.length ? "資料不足" : tee0 ? `${tot} 桿 ${dv0 === 0 ? "±0" : dv0 > 0 ? "+" + dv0 : "−" + (-dv0)}` : `再 ${tot} 桿`, small: lie === "G" || !steps.length ? "" : "兩推", hgt: 46 });
+    labs.push({ y: y0 + 26 * u, tot: 1, big: lie === "G" ? "兩推" : !steps.length ? "資料不足" : tee0 ? `${tot} 桿 ${dv0 === 0 ? "±0" : dv0 > 0 ? "+" + dv0 : "−" + (-dv0)}` : `再 ${tot} 桿`, small: lie === "G" || !steps.length ? "" : "建議打法・含兩推", hgt: 46 });
     mapBox.replaceChildren(); const svg = el("svg", { viewBox: `${vx0} ${y0} ${vw} ${hh}`, style: `height:${ch}px`, preserveAspectRatio: "xMidYMid meet" }, mapBox); el("rect", { x: vx0, y: y0, width: vw, height: hh, fill: "#0c0c0b" }, svg); drawCourse(svg, geo);
     if (d > 0) { const line = onPath ? [pos, ...Array.from({ length: 41 }, (_, i) => P.at(pj.s + (P.total - pj.s) * i / 40))] : [pos, H.pin];
       el("polyline", { points: line.map(q2 => q2.map(v => v.toFixed(1)).join(",")).join(" "), fill: "none", stroke: "#fff", "stroke-width": 1.2 * k, "stroke-dasharray": `${4 * k} ${4 * k}`, "stroke-opacity": 0.8 }, svg);
@@ -1632,7 +1637,7 @@ DRAW.roundlist = (sec, host) => {
     h("div", "cap", p, "常態距離（中位數，碼），括號是球數"); };
   const shotsTable = r => { const box = document.createElement("div"), tb = h("table", "rt", box), hh = h("tr", "", tb);
     ["洞", "Par", "碼", "擊球", "推", "桿", "±"].forEach(x => h("th", "", hh, x));
-    const AB = { "一號木桿": "1W", "三號木杆": "3W", "鐵木桿": "H", "P杆": "P", "A杆": "A", "Putter": "PT" }, ab = c => AB[c] || String(c).replace(/^(\d)鐵$/, "$1i").replace(/^(\d\d)度$/, "$1°");
+    const AB = REPORT.abbr || {}, ab = c => AB[c] || String(c).replace(/^(\d)鐵$/, "$1i").replace(/^(\d\d)度$/, "$1°");
     r.holes.forEach(([hole, par, yd, shots, putts, est, st], i) => { const tr = h("tr", "", tb);
       h("td", "", tr, hole); h("td", "", tr, par); h("td", "", tr, yd || ""); const td = h("td", "shots", tr);
       shots.forEach(([c, dd]) => { const b = h("span", "chip", td); h("b", "", b, ab(c)); h("span", "", b, " " + dd); b.title = c; });
@@ -1720,7 +1725,7 @@ function render() {
     const s = h("section", sec.kind === "roundlist" || sec.kind === "caddie" ? "solo" : "", main); s.id = sec.id;
     h("h2", "", s, sec.title);
     const host = h("div", "chart", s);
-    DRAW[sec.kind](sec, host);
+    if (!DRAW[sec.kind]) { host.textContent = "場次還不夠，這一頁的統計算不出來。多打幾場再回來看。"; } else { try { DRAW[sec.kind](sec, host); } catch (e) { host.textContent = sec.kind === "caddie" ? "桿弟需要更多場次的擊球紀錄才能給建議（大約 5 場以上）。" : "這張圖畫不出來（資料不足）"; console.error(sec.id, e); } }
     if (host.classList.contains("scroll")) { const hint = h("div", "hint", null, "↔ 可左右滑動"); host.before(hint); }
     if (sec.kind === "caddie") continue;
     const det = h("details", "", s); h("summary", "", det, sec.table.head.length ? "數字表與計算方式" : "說明"); h("p", "note", det, sec.note);
@@ -1746,22 +1751,31 @@ def main():
     n, first, last = con.execute("SELECT COUNT(*), MIN(date), MAX(date) FROM rounds").fetchone()
     shots = con.execute("SELECT COUNT(*) FROM shots").fetchone()[0]
     meta = f"{n} 場（{first} 至 {last}）・{shots} 桿擊球紀錄・產生時間 {datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))):%Y-%m-%d %H:%M}"
-    pages = [("index.html", "MI 高爾夫數據", MAIN, None, None),
-             ("data.html", "MI 高爾夫數據", DATA, ["more.html", "更多分析（其餘 %d 張圖）→" % len(MORE)], None),
-             ("more.html", "MI 高爾夫數據", MORE, ["data.html", "← 回數據"], "data.html"),
-             ("courses.html", "MI 高爾夫數據", [section_courses], None, None),
-             ("plan.html", "MI 高爾夫數據", [section_plan], None, None),
-             ("caddie.html", "MI 高爾夫數據", [section_caddie], None, None)]
+    T0 = SITE_TITLE
+    pages = [("index.html", T0, MAIN, None, None),
+             ("data.html", T0, DATA, ["more.html", "更多分析（其餘 %d 張圖）→" % len(MORE)], None),
+             ("more.html", T0, MORE, ["data.html", "← 回數據"], "data.html"),
+             ("courses.html", T0, [section_courses], None, None),
+             ("plan.html", T0, [section_plan], None, None),
+             ("caddie.html", T0, [section_caddie], None, None)]
     tabs = [["index.html", "場次"], ["data.html", "數據"], ["courses.html", "球場"], ["plan.html", "計劃"], ["caddie.html", "桿弟"]]
-    os.makedirs(os.path.dirname(OUT), exist_ok=True)
+    if not PLAN_ON:                                                  # 訓練計劃是原作者個人的內容（PLAN_* 常數）；新使用者預設不產生這一頁
+        pages = [p for p in pages if p[0] != "plan.html"]; tabs = [t for t in tabs if t[0] != "plan.html"]
+    os.makedirs(os.path.dirname(OUT), exist_ok=True); skipped = []
     for fname, title, sections, link, tab in pages:
-        secs = [f(con) for f in sections]
+        secs = []
+        for f in sections:                                       # 資料很少時（新使用者只有幾場）有些統計算不出來：略過那一張圖，不要讓整個網站產生不出來
+            try: secs.append(f(con))
+            except Exception as e:
+                skipped.append(f"{fname}：{getattr(f, '__name__', '區塊')}（{type(e).__name__}: {e}）")
+        if not secs: secs = [{"id": "empty", "title": "資料還不夠", "note": "", "kind": "empty", "data": [], "table": {"head": [], "rows": []}}]
         for x in secs: x["short"] = NAV_SHORT.get(x["id"], x["title"])          # 導覽列只放簡稱，不放說明
-        report = {"meta": meta, "title": title, "link": link, "success": SUCCESS, "recent_n": RECENT_N, "sections": secs, "tabs": tabs, "tab": tab, "page": fname, "geo": GEO if any(x["kind"] in ("roundlist", "courses", "caddie") for x in secs) else {}}
+        report = {"abbr": ABBR, "clubs": {"driver": DRIVER, "fairway": FAIRWAY, "chip": CHIP_CLUB, "sand": SAND_CLUB}, "meta": meta, "title": title, "link": link, "success": SUCCESS, "recent_n": RECENT_N, "sections": secs, "tabs": tabs, "tab": tab, "page": fname, "geo": GEO if any(x["kind"] in ("roundlist", "courses", "caddie") for x in secs) else {}}
         path = os.path.join(os.path.dirname(OUT), fname)
-        open(path, "w", encoding="utf-8").write(PAGE.replace("__DATA__", json.dumps(report, ensure_ascii=False)))
+        open(path, "w", encoding="utf-8").write(PAGE.replace("__TITLE__", title).replace("__DATA__", json.dumps(report, ensure_ascii=False)))
         print("已產生", path, "|", len(sections), "個區塊")
     print(meta)
+    if skipped: print("⚠️ 有 %d 個區塊因為資料不足或計算失敗而略過（場次多了之後通常會自己出現；原作者的資料不應該出現這一行）：\n  " % len(skipped) + "\n  ".join(skipped))
 
 if __name__ == "__main__":
     main()

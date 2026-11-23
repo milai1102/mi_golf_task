@@ -540,3 +540,23 @@ python3 scripts/build_report.py      # golf.db → reports/index.html（整頁�
   - 只標離瞄準線 28 碼內、在球前方 25 碼以上、不超過旗桿後 12 碼的；最多 5 個，離線越近越優先。距離沿著瞄準線量（`P.proj`），只算離線 45 碼內的頂點（大水池不會被遠處的邊拉長）。
   - 標籤位置會避開擊球的標籤、落點編號和其他障礙物標籤（依序試：右邊、左邊、上面、下面），都放不下就不標。沒有畫連接線。
 - `sweep.py` 全部 398 洞：沒有錯誤、沒有文字超出圖。
+
+## 開源：讓別人用自己的資料（2026-11-23）
+
+- 使用者：這是開源專案，朋友下載之後會請**他自己的 AI（可能是比較弱的模型）**接手，要有清楚的流程和文件，讓那個 AI 能把資料換成朋友自己的，而不是用我的資料。這是開源最核心的問題。
+- 圖上左上角的總結加了一行小字「建議打法・含兩推」（使用者：不註明的話別人看到「5 桿 +1」會覺得奇怪）。
+- **入口文件**：`AGENTS.md`（給任何 AI：先判斷是新使用者還是原作者）→ `docs/SETUP.md`（六個步驟，每一步有「怎麼確認成功」和常見問題）。`README.md` 最上面有連結。
+- **不依賴 Claude 的內建瀏覽器**：新使用者自己在 Chrome 的 Console 貼程式，資料直接下載成檔案（不需要像素通道）。
+  - `scripts/garmin_download.js`：在 connect.garmin.com 執行，下載 `garmin_export_YYYYMMDD.json`（計分卡、擊球、球桿、每桿座標、球洞地圖網址）。邏輯和 `garmin_fetch_new.js` 相同，多了座標和下載。
+  - `scripts/garmin_course_download.js`：在 birdseye.garmin.com 的分頁執行，出現面板讓使用者選剛才的檔案，逐洞描輪廓，下載 `course_geo_export.json`。**這個檔是由 `garmin_course_geo.js` 加上操作介面自動組出來的**，改辨識程式之後要重新產生（見 git 紀錄裡產生它的那段 Python）。
+  - `scripts/ingest_export.py <檔案…>`：把上面兩種檔放進 `data/raw/parts`、`data/raw/gps`、`data/course_geo`。驗校驗碼、自動略過已匯入的計分卡（所以每次下載全部也沒關係）。
+- `scripts/new_user.py --yes`：清掉我的資料（場次、座標、設定、網頁），保留程式、球洞輪廓、球場中文名；把本檔搬到 `docs/original_author_CLAUDE.md`，換上 `docs/templates/CLAUDE.new_user.md`；建立 `data/.my_data` 標記，之後再執行會拒絕。**在我自己的正本上絕對不要執行。**
+- `scripts/check_setup.py`：只讀不改，列出六個步驟的 ✅／❌ 和「下一步」那一行指令。弱的模型只要一直照它做。
+- `scripts/setup_config.py`：從資料猜個人設定（哪一支是一號木、主力球道木、切球桿、沙坑桿、球袋、簡寫），寫 `data/config.json` 和 `data/club_roles.csv`，並印出來請使用者確認。`update.py` 發現沒有 `config.json` 時會自動跑它；沒有資料時 `update.py` 會直接說明要先做哪一步。
+- **個人化的東西都搬進 `data/config.json`**（原本寫死在 `build_report.py`）：`site_title`、`clubs.driver/fairway/chip/sand`、`woods`、`bag`（桿弟頁的球袋，原 `CADDIE_BAG`）、`full_clubs`（「距離」表）、`abbr`（簡寫）、`short_courses`（原 `build_db.py` 的 `SHORT_COURSES`）、`plan`（要不要產生「計劃」頁；我的是 `true`，新使用者預設 `false`，因為 `PLAN_*` 是我個人的內容）。JS 端從 `REPORT.clubs`、`REPORT.abbr` 讀。我的設定檔已進版控，改球袋或簡寫改這個檔。
+- `build_report.py` 的 `main()`：單一區塊算不出來（資料太少時除以零等）就略過那一張圖並在最後印「⚠️ 有 N 個區塊…略過」，不讓整個網站產生不出來。**用我的資料跑不應該出現這一行**，出現就是程式壞了。頁面上畫圖失敗也只顯示「資料不足」。
+- 測試方式（都在 `/tmp` 的副本上做，不動正本）：
+  - 把我的資料轉成匯出檔、球桿名稱全部換成 Garmin 的英文類型名（`/tmp/mkexport.py … --en`），在清空的副本上 `ingest_export.py → update.py`：37 場全部重建、沒有略過的區塊、五個頁面沒有錯誤；只放 1 場時網站也產生得出來（9 個統計區塊略過，桿弟頁顯示需要更多場次）。
+  - 兩支瀏覽器程式用 Playwright 加假的 Garmin 回應跑過（`/home/claude/shot/jstest.py`）：會下載檔案，接著 `ingest_export.py`、`update.py` 都能跑完。
+  - **還沒對真正的 Garmin 跑過**（這次工作時內建瀏覽器沒有連線）。下次彙整新場次（2026-11-26 南寶之後）改用 `garmin_download.js` 的流程實測一次，有問題就修。
+- 重構前後用我的資料比對過：`index.html`、`caddie.html`、`plan.html` 內嵌的資料完全相同。
