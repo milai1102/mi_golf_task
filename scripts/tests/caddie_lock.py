@@ -1,3 +1,4 @@
+import sys; sys.path.insert(0, "/home/claude/shot"); import cadlib
 import asyncio, json, glob
 from playwright.async_api import async_playwright
 f=[x for x in glob.glob('/home/claude/mi_golf_task/data/raw/gps/*.txt') if '032542' in open(x).readline()][0]
@@ -14,10 +15,10 @@ async def main():
         st = lambda: pg.evaluate("[document.querySelector('.cad-holes .on').textContent, document.querySelector('.cad-msg').textContent]")
         await pg.goto("http://localhost:8765/reports/caddie.html"); await pg.wait_for_timeout(1500); print("open", await st())
         await pg.click(".cad-holes .fchip:nth-of-type(8)"); await pg.wait_for_timeout(400); print("pick 8", await st())
-        await pg.locator(".cad-next button", has_text="H").first.click(); await pg.wait_for_timeout(1200); print("tap H", await st())
+        await cadlib.club(pg, "H"); await pg.wait_for_timeout(1200); print("tap H", await st())
         await ctx.set_geolocation({"latitude":H['H5'][1][0],"longitude":H['H5'][1][1],"accuracy":6}); await pg.wait_for_timeout(1200); print("moved", await st())
         await pg.reload(); await pg.wait_for_timeout(1500); print("reload", await st())
-        await pg.locator(".cad-next button", has_text="A").first.click(); await pg.wait_for_timeout(1200)
+        await cadlib.club(pg, "A"); await pg.wait_for_timeout(1200)
         print(json.dumps(json.loads(await pg.evaluate("localStorage.getItem('mi-caddie-shots')"))['holes'], ensure_ascii=False))
         lg = json.loads(await pg.evaluate("localStorage.getItem('mi-caddie-log')"))
         for e in lg:

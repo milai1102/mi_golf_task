@@ -1,3 +1,4 @@
+import sys; sys.path.insert(0, "/home/claude/shot"); import cadlib
 # 最基本的保證：完全不靠 GPS（或 GPS 亂指），手動點洞號也能把 18 洞的成績記完
 import asyncio, json, sys
 from playwright.async_api import async_playwright
@@ -13,7 +14,7 @@ async def one(br, label, **kw):
         for h in range(1, 10):
             await pg.locator(".cad-holes .fchip", has_text=str(h)).first.click(); await pg.wait_for_timeout(250)
             cur = await pg.inner_text(".cad-holes .on")
-            await pg.click(".cad-fin"); await pg.wait_for_timeout(120)
+            await pg.click(".cad-finb"); await pg.wait_for_timeout(120)
             hd = await pg.inner_text(".cad-sheet .hd")
             assert f"第 {h} 洞" in hd and cur == str(h), (area, h, hd, cur)
             N = pg.locator(".cad-sheet .nums")

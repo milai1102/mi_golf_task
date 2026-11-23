@@ -1,3 +1,4 @@
+import sys; sys.path.insert(0, "/home/claude/shot"); import cadlib
 # 整場回放：用過去實際每一桿的座標當假 GPS，照上場的操作走完整場
 # 用法：sim.py <球場英文關鍵字> <球場簡稱> [mode: open|reload|mix] [noise_m]
 import asyncio, json, glob, re, sys, random, math, collections
@@ -34,7 +35,7 @@ async def run(day, holes, br):
     ctx = await br.new_context(viewport={"width": 393, "height": 683}, permissions=["geolocation"], geolocation={"latitude": 25.03, "longitude": 121.56, "accuracy": 8})
     pg = await ctx.new_page(); errs = []; pg.on("pageerror", lambda e: errs.append(str(e)))
     await pg.goto("http://localhost:8765/reports/caddie.html"); await pg.wait_for_timeout(700)
-    state = lambda: pg.evaluate("""(()=>{const q=s=>document.querySelector(s),sl=document.querySelectorAll('.cad-top select')[1];return {c:document.querySelectorAll('.cad-top select')[0].selectedOptions[0].textContent,l:sl&&sl.style.display!=='none'?sl.selectedOptions[0].textContent:'',h:+q('.cad-holes .on').textContent,msg:q('.cad-msg').textContent,row:[...document.querySelectorAll('.cad-next button')].map(b=>b.textContent),sg:(q('.cad-next button.sg')||{}).textContent||'',live:q('.cad-here').classList.contains('live')}})()""")
+    state = lambda: pg.evaluate("""(()=>{const q=s=>document.querySelector(s),sl=document.querySelectorAll('.cad-top select')[1];return {c:document.querySelectorAll('.cad-top select')[0].selectedOptions[0].textContent,l:sl&&sl.style.display!=='none'?sl.selectedOptions[0].textContent:'',h:+q('.cad-holes .on').textContent,msg:q('.cad-msg').textContent,row:[q('.cad-add').textContent],sg:'',live:q('.cad-here').classList.contains('live')}})()""")
     issues = []; n_shots = 0; n_ok_hole = 0; sugsame = 0; subst = 0
     owe = None; clock = [0]; t0 = [0]; hints = []
     async def fill(H0):
@@ -68,15 +69,12 @@ async def run(day, holes, br):
             ab = ABR.get(s['club'], s['club'])
             if ab not in BAG: ab = 'H'; subst += 1
             st = await state()
-            if ab not in st['row'] and '其他' in st['row']: await pg.locator(".cad-next button", has_text="其他").click(); await pg.wait_for_timeout(100); st = await state()
-            if ab not in st['row']: issues.append(f"{day} {want} 第{i+1}桿：沒有球桿列（{st['row']}）"); continue
-            if st['sg'] == ab: sugsame += 1
-            await pg.locator(".cad-next button", has_text=re.compile("^"+re.escape(ab)+"$")).first.click(); await pg.wait_for_timeout(150)
+            await cadlib.club(pg, ab); await pg.wait_for_timeout(150)
         if hn % 2 == 0 or hn == len(holes) - 1:
             clock[0] += 240000; await pg.evaluate("k => localStorage.setItem('__cad_skew', k)", str(int(clock[0] - t0[0])))
             ll = jit(H['pin']); await ctx.set_geolocation({"latitude": ll[0], "longitude": ll[1], "accuracy": 6}); await pg.wait_for_timeout(1000)
-            st = await state(); fin = pg.locator(".cad-next button.fin")
-            if await fin.count() == 0: issues.append(f"{day} {want} 果嶺：上面沒有「記錄成績」（{st['row']}），改按圖上的"); fin = pg.locator(".cad-fin")
+            st = await state(); fin = pg.locator(".cad-finb")
+            if await fin.count() == 0: issues.append(f"{day} {want} 果嶺：上面沒有「記錄成績」（{st['row']}），改按圖上的"); fin = pg.locator(".cad-finb")
             await fin.click(); await pg.wait_for_timeout(150); await fill(H)
         else: owe = H
     store = json.loads(await pg.evaluate("localStorage.getItem('mi-caddie-shots')") or '{}').get('holes', {})
