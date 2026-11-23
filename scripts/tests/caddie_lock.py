@@ -14,7 +14,7 @@ async def main():
         pg = await ctx.new_page(); errs=[]; pg.on("pageerror", lambda e: errs.append(str(e)))
         st = lambda: pg.evaluate("[document.querySelector('.cad-holes .on').textContent, document.querySelector('.cad-msg').textContent]")
         await pg.goto("http://localhost:8765/reports/caddie.html"); await pg.wait_for_timeout(1500); print("open", await st())
-        await pg.click(".cad-holes .fchip:nth-of-type(8)"); await pg.wait_for_timeout(400); print("pick 8", await st())
+        await cadlib.hole(pg, 8); await pg.wait_for_timeout(400); print("pick 8", await st())
         await cadlib.club(pg, "H"); await pg.wait_for_timeout(1200); print("tap H", await st())
         await ctx.set_geolocation({"latitude":H['H5'][1][0],"longitude":H['H5'][1][1],"accuracy":6}); await pg.wait_for_timeout(1200); print("moved", await st())
         await pg.reload(); await pg.wait_for_timeout(1500); print("reload", await st())

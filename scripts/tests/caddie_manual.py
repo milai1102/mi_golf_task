@@ -12,7 +12,7 @@ async def one(br, label, **kw):
         await pg.evaluate("""(a)=>{const s=document.querySelectorAll('.cad-top select')[1];s.value=[...s.options].find(o=>o.textContent===a).value;s.dispatchEvent(new Event('change'));}""", area)
         await pg.wait_for_timeout(300)
         for h in range(1, 10):
-            await pg.locator(".cad-holes .fchip", has_text=str(h)).first.click(); await pg.wait_for_timeout(250)
+            await cadlib.hole(pg, h); await pg.wait_for_timeout(250)
             cur = await pg.inner_text(".cad-holes .on")
             await pg.click(".cad-finb"); await pg.wait_for_timeout(120)
             hd = await pg.inner_text(".cad-sheet .hd")

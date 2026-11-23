@@ -4,3 +4,7 @@ async def club(pg, sel="sg"):
     if await pg.locator(q).count() == 0: q = ".cad-sheet .clubs button:nth-of-type(1)"
     await pg.locator(q).first.click()
 ROW = "[document.querySelector('.cad-add').textContent, document.querySelector('.cad-finb').textContent].join(' | ')"
+
+async def hole(pg, n):
+    await pg.click(".cad-hole"); await pg.wait_for_timeout(120)
+    await pg.locator(f".cad-sheet .hgrid button:nth-of-type({n})").click()
