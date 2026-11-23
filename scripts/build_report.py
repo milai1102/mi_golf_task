@@ -1826,10 +1826,10 @@ DRAW.roundlist = (sec, host) => {
     const R = h("div", "rtot", top); const dir = full(r) && AVG5 != null && Math.abs(r.strokes - AVG5) > FLAT ? (r.strokes < AVG5 ? "dn" : "up") : "";
     h("b", dir, R, r.strokes); h("i", dir, R, dir ? (dir === "dn" ? "▼" : "▲") : "");
     const bars = h("div", "rbars", c), dots = h("div", "rdots", c);
-    r.holes.forEach((x, i) => { const g = i && i % 9 === 0 ? " gap" : "", dv = x[6] - x[1], b = h("i", lvl(dv) + g, bars); if (dv > 0) b.style.height = Math.min(4 + dv * 10, 36) + "px"; if (dv >= 3) b.textContent = "+" + dv; if (dv < 0) b.textContent = "★"; h("i", (x[4] >= 3 ? "d" : "") + g, dots, x[1]); });
+    r.holes.forEach((x, i) => { const g = i && i % 9 === 0 ? " gap" : "", dv = x[6] - x[1], b = h("i", lvl(dv) + g, bars); if (dv > 0) b.style.height = Math.min(4 + dv * 10, 36) + "px"; if (dv >= 3) b.textContent = "+" + dv; if (dv < 0) b.textContent = "★"; h("i", g, dots, x[1]); });
     const ft = h("div", "rsum", c), two = r.holes.length > 9 && r.holes.length <= 18, sub = i => { const part = r.holes.slice(i, i + 9), sp = h("span", "rs", ft, (r.parts && r.parts[i] ? r.parts[i] : i === 0 ? "前九" : "後九") + " "); h("b", "", sp, part.reduce((a, x) => a + x[6], 0)); };
     if (two) sub(0); else h("span", "rs", ft);
-    const mid = h("span", "mid", ft); { const nb = r.holes.filter(x => x[6] < x[1]).length; if (nb) { const d = h("div", "", mid); h("b", "bd", d, "★"); h("b", "", d, " " + nb); } } stat(mid, "Par", r.holes.filter(x => x[6] === x[1]).length, false, "pd"); stat(mid, "三推", r.putts == null ? null : threeOf(r), full(r) && r.putts != null && threeOf(r) <= T.three, "dot"); stat(mid, "爆桿", blowOf(r), full(r) && blowOf(r) <= T.blow, "sq");
+    const mid = h("span", "mid", ft); { const nb = r.holes.filter(x => x[6] < x[1]).length; if (nb) { const d = h("div", "", mid); h("b", "bd", d, "★"); h("b", "", d, " " + nb); } } stat(mid, "Par", r.holes.filter(x => x[6] === x[1]).length, false, "pd"); stat(mid, "爆桿", blowOf(r), full(r) && blowOf(r) <= T.blow, "sq");
     if (two) sub(9); else h("span", "rs", ft);
     return c; };
   const WIDE = innerWidth >= 900; let sel = null;
@@ -1849,7 +1849,7 @@ DRAW.roundlist = (sec, host) => {
   head.remove();
   cats.forEach(([key, label]) => { const n = sec.data.filter(r => r.cat === key).length, b = h("button", "fchip" + (on[key] ? " on" : ""), bar2, `${label} ${n}`);
     b.addEventListener("click", () => { on[key] = !on[key]; b.classList.toggle("on", on[key]); draw(); }); });
-  { const lg = h("div", "rlg", host); [["b", "Birdie"], ["p", "Par"], ["g", "Bogey"], ["d", "Double"], ["x", "爆桿"]].forEach(([k, t]) => { const sp = h("span", "", lg); h("i", k, sp, k === "b" ? "★" : ""); sp.append(t); }); const sp = h("span", "", lg); h("b", "p3", sp, "4"); sp.append(" 柱子下面的數字＝標準桿，紅色＝三推以上"); h("span", "", lg, "柱子越高＝超出標準桿越多"); if (AVG5 != null) { const s3 = h("span", "", lg); h("b", "dn", s3, "▼"); s3.append(" 比最近 " + F5.length + " 場平均少　"); h("b", "up", s3, "▲"); s3.append(" 多（差 " + FLAT + " 桿以內不標）"); } }
+  { const lg = h("div", "rlg", host); [["b", "Birdie"], ["p", "Par"], ["g", "Bogey"], ["d", "Double"], ["x", "爆桿"]].forEach(([k, t]) => { const sp = h("span", "", lg); h("i", k, sp, k === "b" ? "★" : ""); sp.append(t); }); const sp = h("span", "", lg); sp.append("柱子下面的數字＝標準桿"); h("span", "", lg, "柱子越高＝超出標準桿越多"); if (AVG5 != null) { const s3 = h("span", "", lg); h("b", "dn", s3, "▼"); s3.append(" 比最近 " + F5.length + " 場平均少　"); h("b", "up", s3, "▲"); s3.append(" 多（差 " + FLAT + " 桿以內不標）"); } }
   draw();
 };
 
