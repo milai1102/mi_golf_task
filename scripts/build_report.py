@@ -1490,7 +1490,7 @@ DRAW.caddie = (sec, host) => { const CL = REPORT.clubs || {};
     { let cum = 0; steps.forEach(st => { if (st.on) { const q = at(cum + st.from / 2); labs.push({ y: q[1], ax: q[0], ab: ab(st.club), big: Math.round(st.from), hgt: 30, wpx: 70 }); } else cum += st.adv; }); }
     labs.push({ y: pos[1], ax: pos[0] - 6 * u0, big: `${d} 碼`, small: tee0 ? `Par ${H.par}` : LIEZH[lie], hgt: 44, wpx: 100, ball: 1 });
     const exL = Math.max(0, ...labs.map(l => (l.wpx + 10) * u0 - (l.ax - x0))), vw0 = w + exL, vw = Math.max(vw0, hh * cw / ch), vx0 = x0 - exL - (vw - vw0) / 2, u = Math.max(hh / ch, vw / cw), k = 1.35 * u;
-    labs.push({ y: y0 + 26 * u, tot: 1, big: lie === "G" ? "兩推" : !steps.length ? "資料不足" : tee0 ? `${tot} 桿（${dv0 === 0 ? "平標準桿" : dv0 > 0 ? "+" + dv0 : "−" + (-dv0)}）` : `再 ${tot} 桿`, small: lie === "G" || !steps.length ? "" : "建議打法・含兩推", hgt: 46 });
+    labs.push({ y: y0 + 26 * u, tot: 1, big: lie === "G" ? "兩推" : !steps.length ? "資料不足" : tee0 ? `${tot} 桿（${dv0 === 0 ? "平標準桿" : dv0 > 0 ? "+" + dv0 : "−" + (-dv0)}）` : `再 ${tot} 桿`, small: lie === "G" || !steps.length ? "" : `建議打法：${steps.length} ON 2 推`, hgt: 46 });
     mapBox.replaceChildren(); const svg = el("svg", { viewBox: `${vx0} ${y0} ${vw} ${hh}`, style: `height:${ch}px`, preserveAspectRatio: "xMidYMid meet" }, mapBox); el("rect", { x: vx0, y: y0, width: vw, height: hh, fill: "#0c0c0b" }, svg); drawCourse(svg, geo);
     if (d > 0) { const line = onPath ? [pos, ...Array.from({ length: 41 }, (_, i) => P.at(pj.s + (P.total - pj.s) * i / 40))] : [pos, H.pin];
       el("polyline", { points: line.map(q2 => q2.map(v => v.toFixed(1)).join(",")).join(" "), fill: "none", stroke: "#fff", "stroke-width": 1.2 * k, "stroke-dasharray": `${4 * k} ${4 * k}`, "stroke-opacity": 0.8 }, svg);

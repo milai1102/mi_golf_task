@@ -570,3 +570,5 @@ python3 scripts/build_report.py      # golf.db → reports/index.html（整頁�
 - `scripts/make_course_download.py`：產生 `garmin_course_download.js`（辨識程式改了之後重跑）。
 - 假的 Garmin 回應測試改成走這條自動流程（`/home/claude/shot/jstest2.py`），通過。仍然**沒有對真正的 Garmin 跑過**。
 - 桿弟圖左上角的總結改成「5 桿（+1）」（使用者：「5 桿 +1」會被誤讀成 6 桿）；平標準桿寫「4 桿（平標準桿）」，低於寫「（−1）」。上面一行小字「建議打法・含兩推」。
+- 桿弟圖左上角的小字改成「建議打法：3 ON 2 推」（使用者 2026-11-23：用球友的講法，幾桿上果嶺、幾推），下面黃色大字「5 桿（+1）」。不在發球台時是「建議打法：2 ON 2 推」＋「再 4 桿」。
+- 使用者不擔心文件和介面裡有他個人的說法：別人拿到之後可以用口語叫自己的 AI 改。
