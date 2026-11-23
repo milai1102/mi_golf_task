@@ -1210,7 +1210,7 @@ nav{margin:10px 0 0}nav a{font-size:12px;padding:3px 10px}
 .rsc b{display:block;box-sizing:border-box;width:100%;max-width:21px;aspect-ratio:1;margin:0 auto;font-size:12px;font-weight:700;line-height:1;display:flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums;border:1.5px solid transparent;border-radius:2px;color:var(--ink)}
 .rsc b.p{color:var(--up);font-weight:800;font-size:13px}.rsc b.b{border-color:#eda100;border-radius:50%;color:#eda100;font-weight:800}.rsc b.g{border-color:var(--muted)}
 .rsc b.d{border-color:#ef9f27;box-shadow:inset 0 0 0 1.5px var(--page),inset 0 0 0 2.5px #ef9f27;font-size:11px}.rsc b.x{background:var(--down);border-color:var(--down);color:var(--page);font-weight:800}
-.rsc i{display:block;font-style:normal;font-size:9px;line-height:9px;height:9px;letter-spacing:-1.5px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:visible;text-indent:-1.5px}.rsc i.t{color:var(--down)}
+.rsc i{display:block;font-style:normal;font-size:9px;line-height:9px;height:9px;letter-spacing:-1.5px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:visible;text-indent:-1.5px}.rsc i.t{color:var(--down)}.rsc u{display:block;text-decoration:none;font-size:10px;line-height:12px;color:var(--muted);opacity:.8;font-variant-numeric:tabular-nums;margin-bottom:2px}
 .rlg i.p{background:none}.rlg span.k{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;box-sizing:border-box;font-size:10px;font-weight:700;margin-right:5px;border:1.5px solid transparent;border-radius:2px;vertical-align:-3px;color:var(--ink)}
 .rlg span.k.p{color:var(--up)}.rlg span.k.b{border-color:#eda100;border-radius:50%;color:#eda100}.rlg span.k.g{border-color:var(--muted)}.rlg span.k.d{border-color:#ef9f27;box-shadow:inset 0 0 0 1.5px var(--page),inset 0 0 0 2.5px #ef9f27;font-size:9px}.rlg span.k.x{background:var(--down);border-color:var(--down);color:var(--page)}
 .rbars{display:flex;gap:3px;align-items:flex-end;height:46px;padding-bottom:8px;margin-top:6px;box-sizing:border-box}.rbars i,.rdots i{flex:1;display:block;min-width:0}.rbars i.gap,.rdots i.gap{margin-left:9px}
@@ -1833,7 +1833,7 @@ DRAW.roundlist = (sec, host) => {
     const R = h("div", "rtot", top); const dir = full(r) && AVG5 != null && Math.abs(r.strokes - AVG5) > FLAT ? (r.strokes < AVG5 ? "dn" : "up") : "";
     h("b", dir, R, r.strokes); h("i", dir, R, dir ? (dir === "dn" ? "▼" : "▲") : "");
     const sc = h("div", "rsc", c);
-    r.holes.forEach((x, i) => { const dv = x[6] - x[1], cell = h("div", "c" + (i && i % 9 === 0 ? " gap" : ""), sc); h("b", lvl(dv), cell, x[6]); h("i", x[4] >= 3 ? "t" : "", cell, x[4] == null ? "" : "•".repeat(Math.min(x[4], 4))); });
+    r.holes.forEach((x, i) => { const dv = x[6] - x[1], cell = h("div", "c" + (i && i % 9 === 0 ? " gap" : ""), sc); h("u", "", cell, x[1]); h("b", lvl(dv), cell, x[6]); h("i", x[4] >= 3 ? "t" : "", cell, x[4] == null ? "" : "•".repeat(Math.min(x[4], 4))); });
     const ft = h("div", "rsum", c), two = r.holes.length > 9 && r.holes.length <= 18, sub = i => { const part = r.holes.slice(i, i + 9), sp = h("span", "rs", ft, (r.parts && r.parts[i] ? r.parts[i] : i === 0 ? "前九" : "後九") + " "); h("b", "", sp, part.reduce((a, x) => a + x[6], 0)); };
     if (two) sub(0); else h("span", "rs", ft);
     const mid = h("span", "mid", ft); { const nb = r.holes.filter(x => x[6] < x[1]).length; if (nb) { const d = h("div", "", mid); h("b", "bd", d, "★"); h("b", "", d, " " + nb); } } stat(mid, "Par", r.holes.filter(x => x[6] === x[1]).length, false, "pd"); stat(mid, "爆桿", blowOf(r), full(r) && blowOf(r) <= T.blow, "sq");
@@ -1856,7 +1856,7 @@ DRAW.roundlist = (sec, host) => {
   head.remove();
   cats.forEach(([key, label]) => { const n = sec.data.filter(r => r.cat === key).length, b = h("button", "fchip" + (on[key] ? " on" : ""), bar2, `${label} ${n}`);
     b.addEventListener("click", () => { on[key] = !on[key]; b.classList.toggle("on", on[key]); draw(); }); });
-  { const lg = h("div", "rlg", host); [["b", "Birdie", 3], ["p", "Par", 4], ["g", "Bogey", 5], ["d", "Double", 6], ["x", "爆桿（+3 以上）", 7]].forEach(([k, t, n]) => { const sp = h("span", "", lg); h("span", "k " + k, sp, n); sp.append(t); }); h("span", "", lg, "格子裡是那一洞的桿數　• 推桿數（紅色＝三推以上）"); if (AVG5 != null) { const s3 = h("span", "", lg); h("b", "dn", s3, "▼"); s3.append(" 比最近 " + F5.length + " 場平均少　"); h("b", "up", s3, "▲"); s3.append(" 多（差 " + FLAT + " 桿以內不標）"); } }
+  { const lg = h("div", "rlg", host); [["b", "Birdie", 3], ["p", "Par", 4], ["g", "Bogey", 5], ["d", "Double", 6], ["x", "爆桿（+3 以上）", 7]].forEach(([k, t, n]) => { const sp = h("span", "", lg); h("span", "k " + k, sp, n); sp.append(t); }); h("span", "", lg, "上面的小字是標準桿，格子裡是桿數　• 推桿數（紅色＝三推以上）"); if (AVG5 != null) { const s3 = h("span", "", lg); h("b", "dn", s3, "▼"); s3.append(" 比最近 " + F5.length + " 場平均少　"); h("b", "up", s3, "▲"); s3.append(" 多（差 " + FLAT + " 桿以內不標）"); } }
   draw();
 };
 
