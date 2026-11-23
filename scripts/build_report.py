@@ -1523,7 +1523,7 @@ DRAW.caddie = (sec, host) => { const CL = REPORT.clubs || {};
       const mid = at(cum + st.adv / 2); cum += st.adv; const m0 = at(cum); E.push({ n, st, lo, hi, mid, cx: c0[0] + rx * off, cy: c0[1] + ry * off, a, b, ang: Math.atan2(ty, tx) * 180 / Math.PI, xh: Math.hypot(a * tx, b * ty), m: [m0[0] + rx * lt[1] / H.k, m0[1] + ry * lt[1] / H.k] }); }); }
     const tee0 = pos[0] === H.tee[0] && pos[1] === H.tee[1], tot = steps.length + 2, dv0 = tot - H.par, nm0 = dv0 <= -1 ? "Birdie" : dv0 === 0 ? "Par" : dv0 === 1 ? "Bogey" : dv0 === 2 ? "Double" : "+" + dv0, labs = [];
     const ab = cl => (REPORT.abbr || {})[cl] || cl.replace("鐵", "i");
-    E.forEach(e => labs.push({ y: e.mid[1], ax: e.mid[0], ab: ab(e.st.club), no: e.n + 1, big: e.st.adv, hgt: 30, wpx: 104 }));
+    E.forEach(e => labs.push({ y: e.mid[1], ax: e.mid[0], ab: ab(e.st.club), no: e.n + 1, big: e.st.adv, go: e.st.go, hgt: 30, wpx: e.st.go ? 128 : 104 }));
     { let cum = 0; steps.forEach((st, sn) => { if (st.on && !st.go) { const q = at(cum + st.from / 2); labs.push({ y: q[1], ax: q[0], ab: ab(st.club), no: sn + 1, big: Math.round(st.from), hgt: 30, wpx: 90 }); } else cum += st.adv; }); }
     labs.push({ y: pos[1], ax: pos[0] - 6 * u0, big: `${d} 碼`, small: tee0 ? `Par ${H.par}` : lie === "G" ? "在果嶺上" : steps.length ? `再 ${steps.length} 桿上果嶺` : LIEZH[lie], hgt: 44, wpx: 112, ball: 1 });
     const exL = Math.max(0, ...labs.map(l => (l.wpx + 10) * u0 - (l.ax - x0))), vw0 = w + exL, vw = Math.max(vw0, hh * cw / ch), vx0 = x0 - exL - (vw - vw0) / 2, u = Math.max(hh / ch, vw / cw), k = 1.35 * u;
@@ -1539,7 +1539,7 @@ DRAW.caddie = (sec, host) => { const CL = REPORT.clubs || {};
       labs.forEach(l => { let yy = l.cy - l.hgt * u / 2;
         if (l.tot) { const x = vx0 + 6 * u; if (l.small) { yy += 14 * u; el("text", Object.assign({ x, y: yy, "font-size": 14 * u, "font-weight": 600 }, halo), svg, l.small); } yy += 26 * u; el("text", Object.assign({ x, y: yy, "font-size": 24 * u, "font-weight": 800 }, halo, { fill: "#ffd23f" }), svg, l.big); return; }
         const x = Math.max(l.ax - 7 * u, vx0 + (l.wpx + 2) * u), h2 = Object.assign({ "text-anchor": "end" }, halo);
-        if (l.ab) { const t = el("text", Object.assign({ x, y: l.cy + 10 * u, "font-weight": 800 }, h2), svg); el("tspan", { "font-size": 17 * u, fill: "#ffd23f" }, t, (l.no ? "①②③④⑤⑥"[l.no - 1] + " " : "") + l.ab + " "); el("tspan", { "font-size": 28 * u }, t, l.big); return; }
+        if (l.ab) { const t = el("text", Object.assign({ x, y: l.cy + 10 * u, "font-weight": 800 }, h2), svg); el("tspan", { "font-size": 17 * u, fill: "#ffd23f" }, t, (l.no ? "①②③④⑤⑥"[l.no - 1] + " " : "") + l.ab + " "); el("tspan", { "font-size": 28 * u }, t, l.big); if (l.go) el("tspan", { "font-size": 15 * u, fill: "#ff8a5c" }, t, " 拼"); return; }
         yy += 25 * u; el("text", Object.assign({ x, y: yy, "font-size": 24 * u, "font-weight": 800 }, h2), svg, l.big);
         if (l.small) { yy += 15 * u; el("text", Object.assign({ x, y: yy, "font-size": 13 * u, "font-weight": 600 }, h2, { "fill-opacity": 0.85 }), svg, l.small); } });
       if (!tee0) el("text", Object.assign({ x: vx0 + 6 * u, y: y0 + hh - 8 * u, "font-size": 14 * u, "font-weight": 600 }, halo, { "fill-opacity": 0.85 }), svg, `Par ${H.par}` + (H.yd ? `・${H.yd} 碼` : ""));
