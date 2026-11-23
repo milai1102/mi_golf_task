@@ -1208,7 +1208,7 @@ nav{margin:10px 0 0}nav a{font-size:12px;padding:3px 10px}
 .rc2{display:flex;gap:18px;margin-top:2px;font-size:13px;color:var(--muted)}.rc2 b{font-size:16px;color:var(--ink);font-variant-numeric:tabular-nums}.rcard b.ok{color:var(--up)}
 .rsc{display:flex;gap:2px;margin-top:10px}.rsc .c{flex:1;min-width:0;text-align:center}.rsc .c.gap{margin-left:8px}
 .rsc b{display:block;box-sizing:border-box;width:100%;max-width:21px;aspect-ratio:1;margin:0 auto;font-size:12px;font-weight:700;line-height:1;display:flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums;border:1.5px solid transparent;border-radius:2px;color:var(--ink)}
-.rsc b{letter-spacing:-.6px}.rsc b.p{color:var(--up);font-weight:800;font-size:13px}.rsc b.b{color:#eda100;font-weight:800;font-size:13px}.rsc b.g{color:var(--ink2)}
+.rsc b{font-size:13px}.rsc .lb{flex:0 0 11px;margin-right:1px}.rsc .lb b{color:var(--muted);font-weight:700;font-size:14px}.rsc b.p{color:var(--up);font-weight:800;font-size:13px}.rsc b.b{color:#eda100;font-weight:800;font-size:13px}.rsc b.g{color:var(--ink2)}
 .rsc b.d{color:#ef9f27;font-weight:800}.rsc b.x{background:var(--down);border-color:var(--down);color:var(--page);font-weight:800}
 .rsc i{display:block;font-style:normal;font-size:9px;line-height:9px;height:9px;letter-spacing:-1.5px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:visible;text-indent:-1.5px}.rsc i.t{color:var(--down)}.rsc u{display:block;text-decoration:none;font-size:10px;line-height:12px;color:var(--muted);opacity:.8;font-variant-numeric:tabular-nums;margin-bottom:2px}
 .rlg i.p{background:none}.rlg span.k{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;letter-spacing:-.6px;box-sizing:border-box;font-size:10px;font-weight:700;margin-right:5px;border:1.5px solid transparent;border-radius:2px;vertical-align:-3px;color:var(--ink)}
@@ -1832,8 +1832,8 @@ DRAW.roundlist = (sec, host) => {
     const s2 = h("div", "rstk", top); stat(s2, "推桿", r.putts, full(r) && r.putts != null && r.putts <= T.putts);
     const R = h("div", "rtot", top); const dir = full(r) && AVG5 != null && Math.abs(r.strokes - AVG5) > FLAT ? (r.strokes < AVG5 ? "dn" : "up") : "";
     h("b", dir, R, r.strokes); h("i", dir, R, dir ? (dir === "dn" ? "▼" : "▲") : "");
-    const sc = h("div", "rsc", c);
-    r.holes.forEach((x, i) => { const dv = x[6] - x[1], cell = h("div", "c" + (i && i % 9 === 0 ? " gap" : ""), sc); h("u", "", cell, x[1]); h("b", lvl(dv), cell, dv > 0 ? "+" + dv : dv === 0 ? "●" : "−" + (-dv)); h("i", x[4] >= 3 ? "t" : "", cell, x[4] == null ? "" : "•".repeat(Math.min(x[4], 4))); });
+    const sc = h("div", "rsc", c); { const lb = h("div", "lb", sc); h("u", "", lb, "\u00a0"); h("b", "", lb, "+"); }
+    r.holes.forEach((x, i) => { const dv = x[6] - x[1], cell = h("div", "c" + (i && i % 9 === 0 ? " gap" : ""), sc); h("u", "", cell, x[1]); h("b", lvl(dv), cell, dv > 0 ? dv : dv === 0 ? "●" : "−" + (-dv)); h("i", x[4] >= 3 ? "t" : "", cell, x[4] == null ? "" : "•".repeat(Math.min(x[4], 4))); });
     const ft = h("div", "rsum", c), two = r.holes.length > 9 && r.holes.length <= 18, sub = i => { const part = r.holes.slice(i, i + 9), sp = h("span", "rs", ft, (r.parts && r.parts[i] ? r.parts[i] : i === 0 ? "前九" : "後九") + " "); h("b", "", sp, part.reduce((a, x) => a + x[6], 0)); };
     if (two) sub(0); else h("span", "rs", ft);
     const mid = h("span", "mid", ft); { const nb = r.holes.filter(x => x[6] < x[1]).length; if (nb) { const d = h("div", "", mid); h("b", "bd", d, "★"); h("b", "", d, " " + nb); } } stat(mid, "Par", r.holes.filter(x => x[6] === x[1]).length, false, "pd"); stat(mid, "爆桿", blowOf(r), full(r) && blowOf(r) <= T.blow, "sq");
@@ -1856,7 +1856,7 @@ DRAW.roundlist = (sec, host) => {
   head.remove();
   cats.forEach(([key, label]) => { const n = sec.data.filter(r => r.cat === key).length, b = h("button", "fchip" + (on[key] ? " on" : ""), bar2, `${label} ${n}`);
     b.addEventListener("click", () => { on[key] = !on[key]; b.classList.toggle("on", on[key]); draw(); }); });
-  { const lg = h("div", "rlg", host); [["b", "Birdie", "−1"], ["p", "Par", "●"], ["g", "Bogey", "+1"], ["d", "Double", "+2"], ["x", "爆桿（+3 以上）", "+3"]].forEach(([k, t, n]) => { const sp = h("span", "", lg); h("span", "k " + k, sp, n); sp.append(t); }); h("span", "", lg, "上面的小字是標準桿，格子裡是超出標準桿幾桿　• 推桿數（紅色＝三推以上）"); if (AVG5 != null) { const s3 = h("span", "", lg); h("b", "dn", s3, "▼"); s3.append(" 比最近 " + F5.length + " 場平均少　"); h("b", "up", s3, "▲"); s3.append(" 多（差 " + FLAT + " 桿以內不標）"); } }
+  { const lg = h("div", "rlg", host); [["b", "Birdie", "−1"], ["p", "Par", "●"], ["g", "Bogey", "1"], ["d", "Double", "2"], ["x", "爆桿（+3 以上）", "3"]].forEach(([k, t, n]) => { const sp = h("span", "", lg); h("span", "k " + k, sp, n); sp.append(t); }); h("span", "", lg, "上面的小字是標準桿，＋ 那一列是超出標準桿幾桿　• 推桿數（紅色＝三推以上）"); if (AVG5 != null) { const s3 = h("span", "", lg); h("b", "dn", s3, "▼"); s3.append(" 比最近 " + F5.length + " 場平均少　"); h("b", "up", s3, "▲"); s3.append(" 多（差 " + FLAT + " 桿以內不標）"); } }
   draw();
 };
 
