@@ -698,8 +698,18 @@ def caddie_path(tee, pin, k, fairways):
             for y in range(min(ys), max(ys) + 1, 5):
                 dx, dy = x - tee[0], y - tee[1]; t = (dx * ux + dy * uy) * k; lat = (dx * uy - dy * ux) * k
                 if t < 70 or t > L * k - 40 or abs(lat) > 70 or not _inside((x, y), poly): continue
-                bins.setdefault(int(t // 40), []).append((x, y))
-    mid = [(sum(q[0] for q in v) / len(v), sum(q[1] for q in v) / len(v)) for b, v in sorted(bins.items()) if len(v) >= 6]
+                bins.setdefault(int(t // 40), []).append((lat, x, y))
+    mid = []; prev = 0.0                       # 同一段有兩條分開的球道（隔壁洞、雙球道）時，從旗桿往回挑連得上的那一條，不取兩條的平均
+    for bi in sorted(bins, reverse=True):
+        v = sorted(bins[bi]); groups = [[v[0]]]
+        for q in v[1:]:
+            if q[0] - groups[-1][-1][0] > 12: groups.append([])
+            groups[-1].append(q)
+        groups = [g for g in groups if len(g) >= 6]
+        if not groups: continue
+        g = min(groups, key=lambda g: abs(sum(q[0] for q in g) / len(g) - prev)); prev = sum(q[0] for q in g) / len(g)
+        mid.append((sum(q[1] for q in g) / len(g), sum(q[2] for q in g) / len(g)))
+    mid.reverse()
     pts = [tuple(tee)] + mid + [tuple(pin)]
     if sum(((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2) ** 0.5 for a, b in zip(pts, pts[1:])) > L * 1.12: pts = [tuple(tee), tuple(pin)]
     return pts
@@ -1486,8 +1496,9 @@ DRAW.caddie = (sec, host) => { const CL = REPORT.clubs || {};
   const evaluate = (d, l) => M.bag.filter(c => (c !== CL.driver || (l === "T" && d >= 230)) && (c !== CL.sand || CL.sand === CL.chip || l === "B")).map(c => evalClub(c, d, l === "W" ? "R" : l)).filter(Boolean).sort((a, b) => a.exp - b.exp);
   const pathOf = (H, geo) => { const L = Math.hypot(H.pin[0] - H.tee[0], H.pin[1] - H.tee[1]) || 1, ux = (H.pin[0] - H.tee[0]) / L, uy = (H.pin[1] - H.tee[1]) / L, Ly = L * H.k, bins = {};
     (geo.fairway || []).forEach(poly => { const xs = poly.map(q2 => q2[0]), ys = poly.map(q2 => q2[1]), x1 = Math.min(...xs), x2 = Math.max(...xs), y1 = Math.min(...ys), y2 = Math.max(...ys);
-      for (let x = x1; x <= x2; x += 5) for (let y = y1; y <= y2; y += 5) { const dx = x - H.tee[0], dy = y - H.tee[1], t = (dx * ux + dy * uy) * H.k, lat = (dx * uy - dy * ux) * H.k; if (t < 70 || t > Ly - 40 || Math.abs(lat) > 70 || !inside([x, y], poly)) continue; const b = Math.floor(t / 40); (bins[b] = bins[b] || []).push([x, y]); } });
-    let mid = Object.keys(bins).map(Number).sort((a, b) => a - b).filter(b => bins[b].length >= 6).map(b => [bins[b].reduce((a, q2) => a + q2[0], 0) / bins[b].length, bins[b].reduce((a, q2) => a + q2[1], 0) / bins[b].length]);
+      for (let x = x1; x <= x2; x += 5) for (let y = y1; y <= y2; y += 5) { const dx = x - H.tee[0], dy = y - H.tee[1], t = (dx * ux + dy * uy) * H.k, lat = (dx * uy - dy * ux) * H.k; if (t < 70 || t > Ly - 40 || Math.abs(lat) > 70 || !inside([x, y], poly)) continue; const b = Math.floor(t / 40); (bins[b] = bins[b] || []).push([lat, x, y]); } });
+    let mid = [], prevLat = 0; const avg = (g, i) => g.reduce((a, q2) => a + q2[i], 0) / g.length;
+    Object.keys(bins).map(Number).sort((a, b) => b - a).forEach(b => { const v = bins[b].slice().sort((a, c) => a[0] - c[0]); let gs = [[v[0]]]; for (let i = 1; i < v.length; i++) { if (v[i][0] - v[i - 1][0] > 12) gs.push([]); gs[gs.length - 1].push(v[i]); } gs = gs.filter(g => g.length >= 6); if (!gs.length) return; const g = gs.reduce((a, c) => Math.abs(avg(c, 0) - prevLat) < Math.abs(avg(a, 0) - prevLat) ? c : a); prevLat = avg(g, 0); mid.unshift([avg(g, 1), avg(g, 2)]); });
     { const len = pp => pp.reduce((a, q2, i) => i ? a + Math.hypot(q2[0] - pp[i - 1][0], q2[1] - pp[i - 1][1]) : 0, 0); if (len([H.tee, ...mid, H.pin]) > L * 1.12) mid = []; }
     const pts = [H.tee, ...mid, H.pin], cum = [0]; for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]) * H.k);
     const total = cum[cum.length - 1], at = sy => { const v = Math.max(0, Math.min(total, sy)); for (let i = 1; i < pts.length; i++) if (v <= cum[i]) { const f = (v - cum[i - 1]) / (cum[i] - cum[i - 1] || 1); return [pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * f, pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * f]; } return pts[pts.length - 1]; };
