@@ -560,3 +560,13 @@ python3 scripts/build_report.py      # golf.db → reports/index.html（整頁�
   - 兩支瀏覽器程式用 Playwright 加假的 Garmin 回應跑過（`/home/claude/shot/jstest.py`）：會下載檔案，接著 `ingest_export.py`、`update.py` 都能跑完。
   - **還沒對真正的 Garmin 跑過**（這次工作時內建瀏覽器沒有連線）。下次彙整新場次（2026-11-26 南寶之後）改用 `garmin_download.js` 的流程實測一次，有問題就修。
 - 重構前後用我的資料比對過：`index.html`、`caddie.html`、`plan.html` 內嵌的資料完全相同。
+
+## 開源流程改成「由 AI 操作」（2026-11-23，取代上一節裡「新使用者自己在 Console 貼程式」的寫法）
+
+- 使用者：不要叫人自己貼腳本。應該像他和 Claude 的做法：對方下載專案後，**由他的 AI** 清資料、請使用者登入 Garmin Connect、AI 自己在頁面裡抓資料。只要文件寫得夠清楚，接手的 AI 不必是最強的模型也做得完。流程要寫在 README 和文件裡，AI 讀完專案就知道怎麼做。
+- `README.md` 最上面：使用者只要對 AI 說「讀 AGENTS.md 和 docs/SETUP.md，幫我把這個專案換成我自己的 Garmin 資料」，下面一張表列出 AI 會做的六件事和對應的指令。
+- `docs/SETUP.md` 整份改寫成**給 AI 的操作手冊**：需要的能力、六條規則（每步跑 `check_setup.py`、不代填密碼、下載前先告知…）、六個步驟各有「確認成功」和「出問題時」、每打完一場怎麼更新、沒有瀏覽器工具時的退路（才請使用者自己貼）、`config.json` 欄位說明。
+- 球洞輪廓那一步不再需要選檔案：`garmin_download.js` 跑完後頁面上有 `__golfOpenMaps(["球場代碼",…])`，執行後頁面跳到球洞圖、清單帶在網址的 `#golf=` 後面；在那一頁執行 `garmin_course_download.js` 會自動開始、自動下載。`check_setup.py` 第 6 項會直接印出要執行的那一行（含缺的球場代碼）。手動選檔案的面板保留當退路。
+- `scripts/make_course_download.py`：產生 `garmin_course_download.js`（辨識程式改了之後重跑）。
+- 假的 Garmin 回應測試改成走這條自動流程（`/home/claude/shot/jstest2.py`），通過。仍然**沒有對真正的 Garmin 跑過**。
+- 桿弟圖左上角的總結改成「5 桿（+1）」（使用者：「5 桿 +1」會被誤讀成 6 桿）；平標準桿寫「4 桿（平標準桿）」，低於寫「（−1）」。上面一行小字「建議打法・含兩推」。

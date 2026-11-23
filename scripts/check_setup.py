@@ -16,7 +16,7 @@ mine = os.path.exists(J("data/.my_data"))
 step(mine, "1 清掉原作者的資料", "data/.my_data 存在" if mine else "這個資料夾裡還是原作者（milai1102）的資料",
      "python3 scripts/new_user.py --yes　（如果你就是原作者，不需要做這一步，也不需要這份檢查）")
 step(n("data/raw/parts/rounds_*.txt") > 0, "2 下載並放入 Garmin 資料", f"data/raw/parts 有 {n('data/raw/parts/rounds_*.txt')} 個 rounds 檔、data/raw/gps 有 {n('data/raw/gps/*.txt')} 個座標檔",
-     "照 docs/SETUP.md 第 3 步：在 Chrome 的 Console 執行 scripts/garmin_download.js，再執行 python3 scripts/ingest_export.py <下載的檔案>")
+     "照 docs/SETUP.md 第 3 步：請使用者在瀏覽器登入 Garmin Connect，在那個分頁執行 scripts/garmin_download.js，再執行 python3 scripts/ingest_export.py <下載的檔案>")
 step(n("data/rounds/*.csv") > 0, "3 產生場次檔", f"data/rounds 有 {n('data/rounds/*.csv')} 場", "python3 scripts/update.py")
 cfg = {}
 if os.path.exists(J("data/config.json")):
@@ -39,6 +39,6 @@ for p in glob.glob(J("data/raw/gps/*.txt")):
             if len(f) > 3 and f[3].startswith("gid"): need.add(f[3].split("/")[0][3:])
 lack = sorted(need - geo)
 step(not lack, "6 球洞輪廓（選配：球場頁、揮桿圖、桿弟頁才需要）", f"你打過的球場代碼 {len(need)} 個，缺輪廓 {len(lack)} 個" + (f"：{lack[:8]}" if lack else ""),
-     "照 docs/SETUP.md 第 5 步：在 birdseye.garmin.com 的分頁執行 scripts/garmin_course_download.js，再 python3 scripts/ingest_export.py course_geo_export.json，然後 python3 scripts/update.py")
+     "照 docs/SETUP.md 第 5 步：在 Garmin Connect 的分頁執行 __golfOpenMaps(" + json.dumps(lack) + ")，頁面跳到球洞圖後執行 scripts/garmin_course_download.js，下載完再 python3 scripts/ingest_export.py <course_geo_export.json>，然後 python3 scripts/update.py")
 for s in steps: print(s[0], s[1], "—", s[2])
 print("\n下一步：" + (nxt or "全部完成。之後每打完一場：重做第 3 步（下載）→ ingest_export.py → update.py。要放上網站看 docs/SETUP.md 第 6 步。"))

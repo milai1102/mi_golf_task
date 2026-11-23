@@ -25,7 +25,7 @@ python3 scripts/setup_config.py --force        # 重新猜球桿設定（會覆�
 
 ## 每打完一場
 
-1. 照 `docs/SETUP.md` 第 3 步再下載一次（每次都下載全部沒關係，重複的會自動略過）。
+1. 照 `docs/SETUP.md` 第 3 步再下載一次：請使用者在瀏覽器登入 Garmin Connect，你在那個分頁執行 `scripts/garmin_download.js`（每次都下載全部沒關係，重複的會自動略過）。
 2. `python3 scripts/ingest_export.py <檔案>` → `python3 scripts/update.py`。
 3. 新球場沒有球洞圖：做 `docs/SETUP.md` 第 5 步。
 

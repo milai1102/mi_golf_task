@@ -5,6 +5,7 @@
 //      Chrome 第一次會要求先輸入 allow pasting 再貼。
 //   3. 等 Console 印出「完成」，瀏覽器會自動下載 garmin_export_YYYYMMDD.json。
 //   4. 回到專案資料夾執行：python3 scripts/ingest_export.py <下載的檔案路徑>
+// 由 AI 透過瀏覽器工具執行也可以（docs/SETUP.md 的主要做法）：整段當成一個運算式執行即可，它會自己下載檔案。
 // 只讀取資料，不會修改 Garmin 上的任何東西；資料只存在你的電腦裡。模擬場次（SIMULATION）不下載。
 // 已經匯入過的計分卡不用特別排除：ingest_export.py 會自動略過重複的。
 (async () => {
@@ -71,7 +72,11 @@
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(out)], { type: 'application/json' })); a.download = name; document.body.appendChild(a); a.click(); a.remove();
     window.__GOLF_EXPORT = out;
     say(`完成：${summary.length} 張計分卡、${shots.length} 桿、${Object.keys(maps).length} 張球洞地圖網址` + (failed.length ? `；${failed.length} 張失敗（見 window.__GOLF_EXPORT.failed）` : '') + `。已下載 ${name}`);
-    say('下一步：python3 scripts/ingest_export.py <下載的檔案>。要球洞圖的話，再照 docs/SETUP.md 第 5 步做。');
-    const first = Object.values(maps)[0]; if (first) say('第 5 步要開的網址（今天內有效）：' + first);
+    say('下一步：python3 scripts/ingest_export.py <下載的檔案>');
+    window.__golfOpenMaps = (cids) => { const want = cids && cids.length ? new Set(cids.map((c) => String(c).padStart(6, '0'))) : null, pick = {};
+      for (const k in maps) if (!want || want.has(k.split('_')[0].padStart(6, '0'))) pick[k] = maps[k];
+      const keys = Object.keys(pick); if (!keys.length) { console.error('[golf] 這些球場代碼在這次下載的資料裡沒有地圖網址：' + JSON.stringify(cids)); return 0; }
+      const url = pick[keys[0]] + '#golf=' + btoa(unescape(encodeURIComponent(JSON.stringify(pick)))); setTimeout(() => { location.href = url; }, 300); return keys.length; };
+    say('要球洞圖：在這個分頁執行 __golfOpenMaps(["球場代碼", …])（代碼由 python3 scripts/check_setup.py 列出；不給參數＝全部），頁面會跳到一張球洞圖，再在那一頁執行 scripts/garmin_course_download.js。');
   } catch (e) { console.error('[golf] 失敗：' + e + '。常見原因：沒登入、登入過期（重新整理頁面再試）、Garmin 改版。'); }
 })();
