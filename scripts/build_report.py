@@ -714,6 +714,97 @@ def caddie_path(tee, pin, k, fairways):
     if sum(((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2) ** 0.5 for a, b in zip(pts, pts[1:])) > L * 1.12: pts = [tuple(tee), tuple(pin)]
     return pts
 
+ROUTE_STEP = 5                                # 找瞄準線用的格子大小（像素）
+ROUTE_COST = {"out": 6.0, "rough": 2.0, "tree": 4.5, "sand": 2.5, "water": 6.0, "green": 1.1, "fairway": 1.0}      # 每走一碼的代價：球道最便宜，樹和水最貴
+_ROUTE_CACHE = None
+
+def _mask(polys, X, Y):
+    """格點是否落在任一多邊形裡（numpy 的射線法）。"""
+    import numpy as np
+    m = np.zeros(X.shape, bool)
+    for poly in polys or []:
+        if len(poly) < 3: continue
+        ins = np.zeros(X.shape, bool)
+        for i in range(len(poly)):
+            (x1, y1), (x2, y2) = poly[i], poly[i - 1]
+            if y1 == y2: continue
+            ins ^= ((y1 > Y) != (y2 > Y)) & (X < (x2 - x1) * (Y - y1) / (y2 - y1) + x1)
+        m |= ins
+    return m
+
+def caddie_route(tee, pin, k, geo, par=4):
+    """瞄準線：從發球台到旗桿「代價最低」的路線（球道便宜、長草普通、樹和水很貴），再拉直成幾段折線。
+    三桿洞、沒有球道輪廓、或算出來長得不合理時用直線。結果依輸入做快取（data/processed/caddie_route.json）。"""
+    import numpy as np, heapq, hashlib
+    global _ROUTE_CACHE
+    straight = [[round(tee[0]), round(tee[1])], [round(pin[0]), round(pin[1])]]
+    if (par or 4) <= 3 or not geo or not geo.get("fairway"): return straight
+    cpath = os.path.join(ROOT, "data/processed/caddie_route.json")
+    if _ROUTE_CACHE is None:
+        try: _ROUTE_CACHE = json.load(open(cpath))
+        except Exception: _ROUTE_CACHE = {}
+    key = hashlib.md5(json.dumps([tee, list(pin)[:2], k, geo, ROUTE_STEP, ROUTE_COST, 6], sort_keys=True).encode()).hexdigest()
+    if key in _ROUTE_CACHE: return _ROUTE_CACHE[key]
+    g = ROUTE_STEP
+    allp = [q for kk in geo for poly in geo[kk] for q in (poly if poly and isinstance(poly[0], (list, tuple)) else [])] + [tee, list(pin)[:2]]
+    x0 = int(min(q[0] for q in allp)) - 2 * g; y0 = int(min(q[1] for q in allp)) - 2 * g
+    nx = int((max(q[0] for q in allp) - x0) // g) + 3; ny = int((max(q[1] for q in allp) - y0) // g) + 3
+    X, Y = np.meshgrid(x0 + np.arange(nx) * g, y0 + np.arange(ny) * g)
+    out = geo.get("outline") or []
+    out = [out] if out and not isinstance(out[0][0], (list, tuple)) else out
+    C = np.full(X.shape, ROUTE_COST["out"])
+    C[_mask(out, X, Y)] = ROUTE_COST["rough"]
+    C[_mask(geo.get("tree"), X, Y)] = ROUTE_COST["tree"]
+    fw = _mask(geo.get("fairway"), X, Y); er = fw.copy(); C[fw] = ROUTE_COST["fairway"] + 0.3
+    for n in range(3):                                                                              # 球道越靠中間越便宜，路線才不會貼著邊走
+        e2 = er.copy(); e2[1:] &= er[:-1]; e2[:-1] &= er[1:]; e2[:, 1:] &= er[:, :-1]; e2[:, :-1] &= er[:, 1:]; er = e2
+        C[er] = ROUTE_COST["fairway"] + 0.2 - 0.1 * n
+    C[_mask([q for q in geo.get("green") or [] if q and min(math.hypot(v[0] - pin[0], v[1] - pin[1]) for v in q) * k < 40], X, Y)] = ROUTE_COST["green"]      # 只認旗桿旁邊的果嶺；輪廓裡其他的「果嶺」常常是發球台或辨識錯的區塊
+    C[_mask(geo.get("sand"), X, Y)] = ROUTE_COST["sand"]
+    wm = _mask(geo.get("water"), X, Y); C[wm] = ROUTE_COST["water"]
+    dt = np.hypot(X - tee[0], Y - tee[1]) * k; dp = np.hypot(X - pin[0], Y - pin[1]) * k
+    C[dt < 110] = np.minimum(C[dt < 110], 1.4); C[(dt < 110) & wm] = 3.0                              # 但水例外：繞得開就繞，繞不開（正前方的水）才直接越過                                                       # 開球會飛過發球台前面那一段，那裡是什麼地形不重要
+    C[dp < 15] = 1.0
+    node = lambda pt: (min(ny - 1, max(0, int(round((pt[1] - y0) / g)))), min(nx - 1, max(0, int(round((pt[0] - x0) / g)))))
+    a, b = node(tee), node(pin); INF = 1e18
+    D = np.full(X.shape, INF); D[a] = 0; prev = {}; pq = [(0.0, a)]
+    Cl = C.tolist(); Dl = D.tolist()
+    nb = [(-1, 0, 1), (1, 0, 1), (0, -1, 1), (0, 1, 1), (-1, -1, 1.4142), (-1, 1, 1.4142), (1, -1, 1.4142), (1, 1, 1.4142)]
+    while pq:
+        d, (i, j) = heapq.heappop(pq)
+        if (i, j) == b: break
+        if d > Dl[i][j]: continue
+        ci = Cl[i][j]
+        for di, dj, w in nb:
+            u, v = i + di, j + dj
+            if 0 <= u < ny and 0 <= v < nx:
+                nd = d + w * (ci + Cl[u][v]) / 2
+                if nd < Dl[u][v]: Dl[u][v] = nd; prev[(u, v)] = (i, j); heapq.heappush(pq, (nd, (u, v)))
+    cells = [b]
+    while cells[-1] != a and cells[-1] in prev: cells.append(prev[cells[-1]])
+    cells.reverse()
+    pts = [tuple(tee)] + [(x0 + j * g, y0 + i * g) for i, j in cells[1:-1]] + [tuple(list(pin)[:2])]
+    def seg(p, q):                                                                                   # 直線段的代價（每格取樣）
+        L = math.hypot(q[0] - p[0], q[1] - p[1]); n = max(1, int(L / (g / 2))); tot = 0
+        for t in range(n):
+            f = (t + 0.5) / n; i, j = node((p[0] + (q[0] - p[0]) * f, p[1] + (q[1] - p[1]) * f)); tot += Cl[i][j]
+        return tot / n * L / g
+    cum = [0.0]
+    for p, q in zip(pts, pts[1:]): cum.append(cum[-1] + seg(p, q))
+    res = [pts[0]]; i = 0
+    while i < len(pts) - 1:                                                                          # 拉直：能用一條直線取代、代價又沒有變貴的就取代
+        j = len(pts) - 1
+        while j > i + 1 and seg(pts[i], pts[j]) > (cum[j] - cum[i]) * 1.012 + 0.3: j -= 1
+        res.append(pts[j]); i = j
+    L0 = math.hypot(pin[0] - tee[0], pin[1] - tee[1]) or 1
+    Lp = sum(math.hypot(q[0] - p[0], q[1] - p[1]) for p, q in zip(res, res[1:]))
+    r = straight if Lp > L0 * 1.45 else [[round(p[0]), round(p[1])] for p in res]
+    _ROUTE_CACHE[key] = r
+    try:
+        os.makedirs(os.path.dirname(cpath), exist_ok=True); json.dump(_ROUTE_CACHE, open(cpath, "w"))
+    except Exception: pass
+    return r
+
 COVER_IN, COVER_OUT = 0.3, 0.9                # 桿弟圖落點範圍：內圈、外圈各涵蓋多少比例的球
 
 
@@ -777,8 +868,17 @@ def section_caddie(con):
                 tees = [t for t, f in zip(tees, far) if fm - 30 / kk <= f <= fm + 40 / kk]
                 ks.sort(); tx = sorted(t[0] for t in tees); ty = sorted(t[1] for t in tees)
                 H["k"] = round(ks[len(ks) // 2], 4); H["pin"] = pin; H["tee"] = [tx[len(tx) // 2], ty[len(ty) // 2]]
+                o = (GEO.get(L["cid"], {}).get(str(H["h"]), {}).get("outline") or [[]])[0]; ydm = H.get("yd") or 0
+                if o:                                                                               # 發球台的檢查：落在球洞輪廓外面、或離旗桿比 Garmin 的洞長短很多（第一筆紀錄不是開球），就改用輪廓估
+                    tl = H["k"] * math.hypot(H["tee"][0] - pin[0], H["tee"][1] - pin[1])
+                    off = not (min(q[0] for q in o) - 15 <= H["tee"][0] <= max(q[0] for q in o) + 15 and min(q[1] for q in o) - 15 <= H["tee"][1] <= max(q[1] for q in o) + 15)
+                    if off or (ydm and tl < 0.72 * ydm) or ((max(q[1] for q in o) - H["tee"][1]) * H["k"] > 160 and tl < {3: 80, 4: 220, 5: 380}.get(H.get("par") or 4, 220)):
+                        ty = max(q[1] for q in o) - PREVIEW_TEE_BOTTOM / H["k"]; xs = [q[0] for q in o if abs(q[1] - ty) < 25] or [pin[0]]
+                        tee = [round((min(xs) + max(xs)) / 2), round(ty)]; tl2 = H["k"] * math.hypot(tee[0] - pin[0], tee[1] - pin[1])
+                        if ydm and tl2 > 1: f = min(1.15, max(0.85, ydm / tl2)); tee = [round(pin[0] + (tee[0] - pin[0]) * f), round(pin[1] + (tee[1] - pin[1]) * f)]
+                        print("  發球台改用輪廓估計:", c["short"], L.get("label") or "", H["h"], H["tee"], "→", tee, "原本", round(tl), "碼，Garmin", ydm); H["tee"] = tee; H["tee_est"] = 1
                 keep.append(H)
-                path = caddie_path(H["tee"], pin, H["k"], GEO.get(L["cid"], {}).get(str(H["h"]), {}).get("fairway", []))
+                path = H["path"] = caddie_route(H["tee"], pin, H["k"], GEO.get(L["cid"], {}).get(str(H["h"]), {}), H.get("par"))
                 for p in H["plays"]:
                     for sh in p["shots"][:-1]:                                                      # 每洞最後一筆的落點被設成旗桿，不能用
                         if sh[0] in CADDIE_BAG and abs(_path_offset((sh[2], sh[3]), path, H["k"])) <= 15 and sh[6] >= 40:      # 從中線附近打出去的球，落點偏離中線幾碼
@@ -788,6 +888,10 @@ def section_caddie(con):
     courses = [c for c in courses if c["layouts"]]
     have = {L["cid"] for c in courses for L in c["layouts"]}
     courses += [c for c in preview_courses() if c["layouts"][0]["cid"] not in have]
+    for c in courses:
+        for L in c["layouts"]:
+            for H in L["holes"]:
+                if "path" not in H: H["path"] = caddie_route(H["tee"], H["pin"], H["k"], GEO.get(L["cid"], {}).get(str(H["h"]), {}), H.get("par"))
     m = caddie_model(con)
     q = lambda v, f: v[min(len(v) - 1, int(len(v) * f))]
     pool = sorted(o / y for v in lateral.values() for o, y in v)                                    # 樣本少的球桿：用全部球桿「偏離 ÷ 距離」的比例
@@ -1500,7 +1604,7 @@ DRAW.caddie = (sec, host) => { const CL = REPORT.clubs || {};
     let mid = [], prevLat = 0; const avg = (g, i) => g.reduce((a, q2) => a + q2[i], 0) / g.length;
     Object.keys(bins).map(Number).sort((a, b) => b - a).forEach(b => { const v = bins[b].slice().sort((a, c) => a[0] - c[0]); let gs = [[v[0]]]; for (let i = 1; i < v.length; i++) { if (v[i][0] - v[i - 1][0] > 12) gs.push([]); gs[gs.length - 1].push(v[i]); } gs = gs.filter(g => g.length >= 6); if (!gs.length) return; const g = gs.reduce((a, c) => Math.abs(avg(c, 0) - prevLat) < Math.abs(avg(a, 0) - prevLat) ? c : a); prevLat = avg(g, 0); mid.unshift([avg(g, 1), avg(g, 2)]); });
     { const len = pp => pp.reduce((a, q2, i) => i ? a + Math.hypot(q2[0] - pp[i - 1][0], q2[1] - pp[i - 1][1]) : 0, 0); if (len([H.tee, ...mid, H.pin]) > L * 1.12) mid = []; }
-    const pts = [H.tee, ...mid, H.pin], cum = [0]; for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]) * H.k);
+    const pts = H.path && H.path.length > 1 ? H.path : [H.tee, ...mid, H.pin], cum = [0]; for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]) * H.k);
     const total = cum[cum.length - 1], at = sy => { const v = Math.max(0, Math.min(total, sy)); for (let i = 1; i < pts.length; i++) if (v <= cum[i]) { const f = (v - cum[i - 1]) / (cum[i] - cum[i - 1] || 1); return [pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * f, pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * f]; } return pts[pts.length - 1]; };
     const proj = pt => { let best = { dist: 1e9, s: 0 }; for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], b = pts[i], vx = b[0] - a[0], vy = b[1] - a[1], t = Math.max(0, Math.min(1, ((pt[0] - a[0]) * vx + (pt[1] - a[1]) * vy) / (vx * vx + vy * vy || 1))), dd = Math.hypot(pt[0] - a[0] - t * vx, pt[1] - a[1] - t * vy) * H.k; if (dd < best.dist) best = { dist: dd, s: cum[i - 1] + t * (cum[i] - cum[i - 1]) }; } return best; };
     return { pts, cum, total, at, proj }; };
