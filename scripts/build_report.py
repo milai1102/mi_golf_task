@@ -1478,11 +1478,12 @@ DRAW.caddie = (sec, host) => {
     const sux = (H.pin[0] - pos[0]) / (straight / H.k || 1), suy = (H.pin[1] - pos[1]) / (straight / H.k || 1), at = yd => onPath ? P.at(pj.s + Math.max(0, yd - pj.dist)) : [pos[0] + sux * yd / H.k, pos[1] + suy * yd / H.k];
     const barEl = document.querySelector(".cad-bar"), navEl = document.querySelector(".ptabs"), cw = (mapBox.clientWidth || 360) - 12, ch = NARROW() ? Math.max(400, Math.min(720, innerHeight - Math.max(barEl ? barEl.offsetHeight : 120, mapBox.getBoundingClientRect().top + scrollY) - (navEl ? navEl.offsetHeight : 60) - 14)) : Math.max(560, Math.min(820, innerHeight - 190)), u0 = hh / ch;
     const E = []; { let cum = 0; steps.forEach((st, n) => { if (st.on) return; const lt = latOf(st.club, st.adv), lo = Math.min(st.r.lo, st.from), hi = Math.min(st.r.hi, st.from), c0 = at(cum + (lo + hi) / 2), c1 = at(cum + (lo + hi) / 2 + 4), tl = Math.hypot(c1[0] - c0[0], c1[1] - c0[1]) || 1, tx = (c1[0] - c0[0]) / tl, ty = (c1[1] - c0[1]) / tl, rx = -ty, ry = tx, off = (lt[0] + lt[2]) / 2 / H.k, a = Math.max(6, (hi - lo) / 2) / H.k, b = Math.max(6, (lt[2] - lt[0]) / 2) / H.k;
-      cum += st.adv; const m0 = at(cum); E.push({ n, st, lo, hi, cx: c0[0] + rx * off, cy: c0[1] + ry * off, a, b, ang: Math.atan2(ty, tx) * 180 / Math.PI, xh: Math.hypot(a * tx, b * ty), m: [m0[0] + rx * lt[1] / H.k, m0[1] + ry * lt[1] / H.k] }); }); }
+      const mid = at(cum + st.adv / 2); cum += st.adv; const m0 = at(cum); E.push({ n, st, lo, hi, mid, cx: c0[0] + rx * off, cy: c0[1] + ry * off, a, b, ang: Math.atan2(ty, tx) * 180 / Math.PI, xh: Math.hypot(a * tx, b * ty), m: [m0[0] + rx * lt[1] / H.k, m0[1] + ry * lt[1] / H.k] }); }); }
     const tee0 = pos[0] === H.tee[0] && pos[1] === H.tee[1], tot = steps.length + 2, dv0 = tot - H.par, nm0 = dv0 <= -1 ? "Birdie" : dv0 === 0 ? "Par" : dv0 === 1 ? "Bogey" : dv0 === 2 ? "Double" : "+" + dv0, labs = [];
-    E.forEach(e => labs.push({ y: e.cy, ax: e.cx - e.xh, club: e.st.club, big: `${e.st.adv} 碼`, small: `${e.lo}–${e.hi}`, hgt: 62, wpx: 100 }));
-    steps.forEach(st => { if (st.on) labs.push({ y: H.pin[1] + 6 * u0, ax: H.pin[0] - 10 * u0, club: st.club, big: "上果嶺", small: "", hgt: 46, wpx: 90 }); });
-    labs.push({ y: pos[1], ax: pos[0] - 9 * u0, big: `${d} 碼`, small: LIEZH[lie], hgt: 46, wpx: 100 });
+    const AB2 = { "一號木桿": "1W", "三號木杆": "3W", "鐵木桿": "H", "P杆": "P", "A杆": "A", "54度": "54°" }, ab = cl => AB2[cl] || cl.replace("鐵", "i");
+    E.forEach(e => labs.push({ y: e.mid[1], ax: e.mid[0], ab: ab(e.st.club), big: e.st.adv, hgt: 30, wpx: 84 }));
+    { let cum = 0; steps.forEach(st => { if (st.on) { const q = at(cum + st.from / 2); labs.push({ y: q[1], ax: q[0], ab: ab(st.club), big: Math.round(st.from), hgt: 30, wpx: 70 }); } else cum += st.adv; }); }
+    labs.push({ y: pos[1], ax: pos[0] - 6 * u0, big: `${d} 碼`, small: tee0 ? "" : LIEZH[lie], hgt: tee0 ? 30 : 44, wpx: 100, ball: 1 });
     const exL = Math.max(0, ...labs.map(l => (l.wpx + 10) * u0 - (l.ax - x0))), vw0 = w + exL, vw = Math.max(vw0, hh * cw / ch), vx0 = x0 - exL - (vw - vw0) / 2, u = Math.max(hh / ch, vw / cw), k = 1.35 * u;
     labs.push({ y: y0 + 26 * u, tot: 1, big: lie === "G" ? "兩推" : !steps.length ? "資料不足" : tee0 ? `${tot} 桿 ${nm0}` : `再 ${tot} 桿`, small: lie === "G" || !steps.length ? "" : "兩推", hgt: 46 });
     mapBox.replaceChildren(); const svg = el("svg", { viewBox: `${vx0} ${y0} ${vw} ${hh}`, style: `height:${ch}px`, preserveAspectRatio: "xMidYMid meet" }, mapBox); el("rect", { x: vx0, y: y0, width: vw, height: hh, fill: "#0c0c0b" }, svg); drawCourse(svg, geo);
@@ -1493,9 +1494,9 @@ DRAW.caddie = (sec, host) => {
       const halo = { stroke: "#000", "stroke-width": 3.4 * u, "paint-order": "stroke", "stroke-linejoin": "round", fill: "#fff" };
       labs.forEach(l => { let yy = l.cy - l.hgt * u / 2;
         if (l.tot) { const x = vx0 + 6 * u; if (l.small) { yy += 14 * u; el("text", Object.assign({ x, y: yy, "font-size": 14 * u, "font-weight": 600 }, halo), svg, l.small); } yy += 26 * u; el("text", Object.assign({ x, y: yy, "font-size": 24 * u, "font-weight": 800 }, halo, { fill: "#ffd23f" }), svg, l.big); return; }
-        const x = Math.max(l.ax - 6 * u, vx0 + (l.wpx + 2) * u), h2 = Object.assign({ "text-anchor": "end" }, halo);
-        if (l.club) { yy += 16 * u; el("text", Object.assign({ x, y: yy, "font-size": 15 * u, "font-weight": 700 }, h2), svg, l.club); }
-        yy += 27 * u; el("text", Object.assign({ x, y: yy, "font-size": 27 * u, "font-weight": 800 }, h2), svg, l.big);
+        const x = Math.max(l.ax - 7 * u, vx0 + (l.wpx + 2) * u), h2 = Object.assign({ "text-anchor": "end" }, halo);
+        if (l.ab) { const t = el("text", Object.assign({ x, y: l.cy + 10 * u, "font-weight": 800 }, h2), svg); el("tspan", { "font-size": 17 * u, fill: "#ffd23f" }, t, l.ab + " "); el("tspan", { "font-size": 28 * u }, t, l.big); return; }
+        yy += 25 * u; el("text", Object.assign({ x, y: yy, "font-size": 24 * u, "font-weight": 800 }, h2), svg, l.big);
         if (l.small) { yy += 15 * u; el("text", Object.assign({ x, y: yy, "font-size": 13 * u, "font-weight": 600 }, h2, { "fill-opacity": 0.85 }), svg, l.small); } });
       el("text", Object.assign({ x: vx0 + vw - 6 * u, y: y0 + 18 * u, "text-anchor": "end", "font-size": 14 * u, "font-weight": 600 }, halo, { "fill-opacity": 0.85 }), svg, `Par ${H.par}` + (H.yd ? `・${H.yd} 碼` : "")); }
     { const [px, py] = H.pin; el("line", { x1: px, y1: py, x2: px, y2: py - 16 * k, stroke: "#fff", "stroke-width": 1.5 * k }, svg); el("polygon", { points: `${px},${py - 16 * k} ${px + 9 * k},${py - 12.5 * k} ${px},${py - 9 * k}`, fill: "#ff3b3b" }, svg); }
