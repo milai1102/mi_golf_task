@@ -5,6 +5,7 @@
 用法：python3 scripts/build_report.py
 """
 import csv, datetime, glob, json, os, shutil, sqlite3, statistics, tempfile
+import math
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB, OUT = os.path.join(ROOT, "data/processed/golf.db"), os.path.join(ROOT, "reports/index.html")
@@ -703,6 +704,9 @@ def caddie_path(tee, pin, k, fairways):
     if sum(((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2) ** 0.5 for a, b in zip(pts, pts[1:])) > L * 1.12: pts = [tuple(tee), tuple(pin)]
     return pts
 
+COVER_IN, COVER_OUT = 0.3, 0.9                # 桿弟圖落點範圍：內圈、外圈各涵蓋多少比例的球
+
+
 def _path_offset(pt, pts, k):
     """點到折線的距離（碼）；正值＝在行進方向的右邊。"""
     best = None
@@ -780,6 +784,17 @@ def section_caddie(con):
     m["lat"] = {c: [round(q(sorted(o for o, _ in v), 0.1)), round(q(sorted(o for o, _ in v), 0.5)), round(q(sorted(o for o, _ in v), 0.9)), len(v)] for c, v in lateral.items() if len(v) >= 20}
     m["latr"] = [round(q(pool, 0.1), 3), round(q(pool, 0.5), 3), round(q(pool, 0.9), 3)] if pool else [-0.15, 0, 0.15]
     print("左右偏差（碼，右為正）[十分位, 中位數, 九十分位, 球數]:", m["lat"], "比例:", m["latr"])
+    def _rad(v):                                                                                    # 每一球落在「十分位到九十分位」橢圓的幾倍半徑上
+        os_, ys = sorted(o for o, _ in v), sorted(y for _, y in v)
+        oa, ob, ya, yb = q(os_, 0.1), q(os_, 0.9), q(ys, 0.1), q(ys, 0.9)
+        return sorted(math.hypot((o - (oa + ob) / 2) / max(1, (ob - oa) / 2), (y - (ya + yb) / 2) / max(1, (yb - ya) / 2)) for o, y in v)
+    rad = {c: _rad(v) for c, v in lateral.items() if len(v) >= 20}
+    allr = sorted(r for v in rad.values() for r in v)
+    cov = lambda v: [round(q(v, COVER_IN), 2), round(q(v, COVER_OUT), 2)]
+    m["cov"] = {c: cov(v) for c, v in rad.items() if len(v) >= 40}                                  # 落點橢圓的倍率：[內圈, 外圈]
+    m["covr"] = cov(allr) if allr else [0.66, 1.67]
+    m["covp"] = [COVER_IN, COVER_OUT]
+    print("落點範圍倍率 [內圈 %d%%, 外圈 %d%%]:" % (COVER_IN * 100, COVER_OUT * 100), m["cov"], "全部:", m["covr"], "（原本的橢圓涵蓋 %.0f%%）" % (100 * sum(1 for r in allr if r <= 1) / max(1, len(allr))))
     note = ("在圖上點一下，當成球現在的位置。系統算出離旗桿幾碼、判斷球位，再用你的歷史紀錄估計「用每一支桿，預期還要幾桿進洞」，建議數字最小的那一支。"
             "做法：①「還要幾桿」的表：你每一筆擊球之前的位置（離旗桿幾碼、什麼球位）→ 那一洞從這一桿起實際又用了幾桿，分組取平均並修成不遞減。"
             "② 每支桿的結果直接取你用這支桿打過的球：離旗桿在這支桿打得到的範圍內，取起點距離相近（±25%）的那些球實際的結果；超出範圍就取全揮桿的前進距離，算出落點再查表。"
@@ -1439,7 +1454,7 @@ DRAW.caddie = (sec, host) => { const CL = REPORT.clubs || {};
   const note = (st, extra) => { const { H } = cur(), tp = [H.tee, ...track], n = track.length, lastYd = n ? Math.round(Math.hypot(tp[n][0] - tp[n - 1][0], tp[n][1] - tp[n - 1][1]) * H.k) : 0; gpsMsg.replaceChildren();
     const t = st === "add" ? `已記第 ${n} 桿・${lastYd} 碼` : st === "same" ? "同一個位置，沒有多記一桿" : st === "tee" ? (n ? "你在發球台附近，沒有記桿" : "發球台・還沒記桿") : st === "undo" ? (n ? `已取消，剩 ${n} 桿的紀錄` : "已取消，回到發球台") : "";
     h("span", "", gpsMsg, t + (extra ? "　" + extra : "")); if (st === "add") { const b = h("button", "cad-undo", gpsMsg, "取消這一桿"); b.addEventListener("click", undo); } };
-  const gpsRow = h("div", "cad-gps", host), gpsBtn = h("button", "cad-here", gpsRow, "我在這裡，怎麼打？"), gpsMsg = h("span", "cad-msg", gpsRow); let lastSay = "";
+  const gpsRow = h("div", "cad-gps", host), gpsBtn = h("button", "cad-here", gpsRow, "我在這裡，怎麼打？"), gpsMsg = h("span", "cad-msg", gpsRow); let lastSay = "", msgT = 0; new MutationObserver(() => { clearTimeout(msgT); const t = gpsMsg.textContent; if (t && t !== "定位中…") msgT = setTimeout(() => gpsMsg.replaceChildren(), /定位|球場|權限|https|出錯/.test(t) && !/^已記|^同一|發球台/.test(t) ? 12000 : 6000); }).observe(gpsMsg, { childList: true, characterData: true, subtree: true });
   const toPx = (H, lat, lon) => { const g = H.ll, dx = lon - g[1], dy = lat - g[0]; return [g[2] * dx + g[3] * dy + g[4], g[5] * dx + g[6] * dy + g[7]]; };
   const segDist = (p, a, b) => { const vx = b[0] - a[0], vy = b[1] - a[1], t = Math.max(0, Math.min(1, ((p[0] - a[0]) * vx + (p[1] - a[1]) * vy) / (vx * vx + vy * vy || 1))); return Math.hypot(p[0] - a[0] - t * vx, p[1] - a[1] - t * vy); };
   const locate = (lat, lon) => { let bestH = null; sec.data.forEach((c, i) => { if (!c.ll || Math.abs(c.ll[0] - lat) > 0.05 || Math.abs(c.ll[1] - lon) > 0.05) return; c.layouts.forEach((L, j) => L.holes.forEach((H, n) => { if (!H.ll) return; const p = toPx(H, lat, lon), dd = segDist(p, H.tee, H.pin) * H.k; if (!bestH || dd < bestH.dd) bestH = { dd, i, j, n, p }; })); }); return bestH; };
@@ -1513,7 +1528,8 @@ DRAW.caddie = (sec, host) => { const CL = REPORT.clubs || {};
     mapBox.replaceChildren(); const svg = el("svg", { viewBox: `${vx0} ${y0} ${vw} ${hh}`, style: `height:${ch}px`, preserveAspectRatio: "xMidYMid meet" }, mapBox); el("rect", { x: vx0, y: y0, width: vw, height: hh, fill: "#0c0c0b" }, svg); drawCourse(svg, geo);
     if (d > 0) { const line = onPath ? [pos, ...Array.from({ length: 41 }, (_, i) => P.at(pj.s + (P.total - pj.s) * i / 40))] : [pos, H.pin];
       el("polyline", { points: line.map(q2 => q2.map(v => v.toFixed(1)).join(",")).join(" "), fill: "none", stroke: "#fff", "stroke-width": 1.2 * k, "stroke-dasharray": `${4 * k} ${4 * k}`, "stroke-opacity": 0.8 }, svg);
-      E.forEach(e => { el("ellipse", { cx: e.cx, cy: e.cy, rx: e.a, ry: e.b, transform: `rotate(${e.ang} ${e.cx} ${e.cy})`, fill: "#ffd23f", "fill-opacity": 0.3, stroke: "#ffd23f", "stroke-width": 2 * k }, svg); el("circle", { cx: e.m[0], cy: e.m[1], r: 7 * k, fill: "#ffd23f", stroke: "#111", "stroke-width": k }, svg); el("text", { x: e.m[0], y: e.m[1] + 3.6 * k, "text-anchor": "middle", "font-size": 10 * k, "font-weight": 700, fill: "#111" }, svg, e.n + 1); }); }
+      E.forEach((e, n) => { const cv = M.cov[e.st.club] || M.covr, rot = `rotate(${e.ang} ${e.cx} ${e.cy})`; el("ellipse", { cx: e.cx, cy: e.cy, rx: e.a * cv[1], ry: e.b * cv[1], transform: rot, fill: "#ffd23f", "fill-opacity": 0.13, stroke: "#ffd23f", "stroke-width": 1.2 * k, "stroke-opacity": 0.75 }, svg); el("ellipse", { cx: e.cx, cy: e.cy, rx: e.a * cv[0], ry: e.b * cv[0], transform: rot, fill: "#ffd23f", "fill-opacity": 0.38, stroke: "#ffd23f", "stroke-width": 2 * k }, svg);
+        if (!n) { const ex = e.xh, pc = v => Math.round(M.covp[v] * 100) + "%"; [[cv[1], 1], [cv[0], 0]].forEach(([f, v]) => el("text", { x: e.cx + ex * f + 3 * k, y: e.cy + 3 * k, "font-size": 9.5 * k, "font-weight": 700, fill: "#ffd23f", stroke: "#000", "stroke-width": 2.4 * k, "paint-order": "stroke" }, svg).textContent = pc(v)); } el("circle", { cx: e.m[0], cy: e.m[1], r: 7 * k, fill: "#ffd23f", stroke: "#111", "stroke-width": k }, svg); el("text", { x: e.m[0], y: e.m[1] + 3.6 * k, "text-anchor": "middle", "font-size": 10 * k, "font-weight": 700, fill: "#111" }, svg, e.n + 1); }); }
     { labs.sort((a, b) => b.y - a.y); let lim = y0 + hh - 4 * u; labs.forEach(l => { l.cy = Math.min(l.y, lim - l.hgt * u / 2); lim = l.cy - l.hgt * u / 2 - 2 * u; }); let top = y0 + 4 * u; labs.slice().reverse().forEach(l => { l.cy = Math.max(l.cy, top + l.hgt * u / 2); top = l.cy + l.hgt * u / 2 + 2 * u; });
       const halo = { stroke: "#000", "stroke-width": 3.4 * u, "paint-order": "stroke", "stroke-linejoin": "round", fill: "#fff" };
       labs.forEach(l => { let yy = l.cy - l.hgt * u / 2;
