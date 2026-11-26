@@ -2057,14 +2057,14 @@ DRAW.roundlist = (sec, host) => {
     const AB = REPORT.abbr || {}, ab = c => AB[c] || String(c).replace(/^(\d)鐵$/, "$1i").replace(/^(\d\d)度$/, "$1°");
     r.holes.forEach(([hole, par, yd, shots, putts, est, st, pen, on, miss], i) => { const tr = h("tr", "", tb);
       h("td", "", tr, hole); h("td", "", tr, par); h("td", "", tr, yd || ""); const td = h("td", "shots", tr);
-      shots.forEach(([c, dd, sr, wc, hz]) => { const b = h("span", "chip" + (sr === "site" ? " site" : ""), td); h("b", "", b, ab(c)); h("span", "", b, " " + (dd == null ? "" : dd)); if (hz) h("i", "hz" + (hz === "OB" ? " ob" : ""), b, hz); b.title = sr === "site" ? c + "（網站補的，手錶沒記到）" : wc ? c + "（手錶記成 " + wc + "）" : c; });
+      shots.forEach(([c, dd, sr, wc, hz]) => { const b = h("span", "chip" + (sr === "site" ? " site" : ""), td); h("b", "", b, ab(c)); if (hz) h("i", "hz" + (hz === "OB" ? " ob" : ""), b, hz); b.title = sr === "site" ? c + "（網站補的，手錶沒記到）" : wc ? c + "（手錶記成 " + wc + "）" : c; });
       if (pen && !shots.some(x => x[4])) { const b = h("span", "chip pen", td); h("b", "", b, "罰"); h("span", "", b, " " + pen); }
       for (let k = 0; k < (miss || 0); k++) { const b = h("span", "chip miss", td); h("b", "", b, "?"); b.title = "手錶沒記到"; }
       h("td", "", tr, on == null ? "" : on); h("td", "", tr, putts == null ? "" : putts); h("td", "", tr, st);
       const dv = st - par; h("td", dv >= 3 ? "bad" : dv <= 0 ? "good" : "", tr, dv > 0 ? "+" + dv : dv === 0 ? "E" : dv);
       if (r.holes.length > 9 && (i % 9 === 8 || i === r.holes.length - 1)) { const k = i - i % 9, part = r.holes.slice(k, i + 1), t2 = h("tr", "tot nine", tb), nm = h("td", "", t2, r.parts && r.parts[k] ? r.parts[k] : k === 0 ? "前九" : k === 9 ? "後九" : ""); nm.colSpan = 4; nm.style.textAlign = "left";
         h("td", "", t2, part.every(x => x[8] != null) ? part.reduce((a, x) => a + x[8], 0) : ""); h("td", "", t2, part.every(x => x[4] != null) ? part.reduce((a, x) => a + x[4], 0) : ""); h("td", "", t2, part.reduce((a, x) => a + x[6], 0)); h("td", "", t2, ""); } });
-    h("p", "note", box, "1W 一號木　H 鐵木　6i 六鐵　單位：碼　綠框＝手錶沒記到、網站補上的一桿　？＝兩邊都沒記到　ON＝幾桿上果嶺");
+    h("p", "note", box, "1W 一號木　H 鐵木　6i 六鐵　綠框＝手錶沒記到、網站補上的一桿　？＝兩邊都沒記到　ON＝幾桿上果嶺　每一桿的距離看揮桿圖");
     return box; };
   const T = sec.targets || {}, full = r => r.cat === "full";
   const FLAT = 2, FULL = sec.data.filter(full), F5 = FULL.slice(0, 5), AVG5 = F5.length ? F5.reduce((a, r) => a + r.strokes, 0) / F5.length : null;
