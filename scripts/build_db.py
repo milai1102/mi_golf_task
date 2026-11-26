@@ -85,6 +85,7 @@ for rid, path in enumerate(sorted(glob.glob(os.path.join(ROUNDS, "*.csv"))), 1):
                 sl = row["start_lie"] if row else LIE.get(x["lie"], "Unknown")
                 el = LIE.get(nxt["lie"], "Unknown") if nxt and nxt["lie"] else (nxt["row"]["start_lie"] if nxt and nxt["row"] else "Green" if not nxt else "Unknown")
                 stype = row["shot_type"] if row else ("TEE" if k == 0 else "CHIP" if ps is not None and ps <= 55 else "APPROACH")
+            if x["conflict"]: problems.append(f"{fname} 第 {seq} 洞第 {k + 1} 桿：球桿兩邊不一致（網站 {x['club']}、手錶 {x['conflict']}），請使用者確認後寫進 data/shot_fixes.csv")
             con.execute("INSERT INTO shots VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)", (rid, seq, k + 1, x["club"], stype, sl, el, d, round(d * YD) if d is not None else None,
                 ps, pe, x["src"], x["conflict"]))
     course = rows[0]["course"]; k = len(holes)

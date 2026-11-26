@@ -120,9 +120,15 @@ def merge_round(fname, rows=None):
             m["dist_m"] = round(dist_m(m["s"], m["e"])) if m["s"] and m["e"] else (int(float(m["row"]["distance_m"])) if m["row"] and m["row"]["distance_m"] else None)
             m["pin_s"] = round(dist_m(m["s"], pin)) if m["s"] and pin else None
             m["pin_e"] = round(dist_m(m["e"], pin)) if m["e"] and pin else None
+        for k, m in enumerate(merged):                       # 使用者確認過的球桿（data/shot_fixes.csv）
+            fx = FIXES.get((fname, seq, k + 1))
+            if fx: m["club"] = fx; m["conflict"] = None; m["fixed"] = True
         hole = {"on": ch.get("on"), "putts": ch.get("putts"), "steps": ch.get("steps"), "cid": cid, "h": h, "pin": pin, "pin_px": g.get("pin_px")}
         out[seq] = {"shots": merged, "hole": hole}
     return out
+
+_fp = os.path.join(ROOT, "data/shot_fixes.csv")
+FIXES = {(r["file"], int(r["seq"]), int(r["shot"])): r["club"] for r in csv.DictReader(open(_fp, encoding="utf-8"))} if os.path.exists(_fp) else {}
 
 SHORT = {r["name_zh"]: r.get("short") or r["name_zh"] for r in csv.DictReader(open(os.path.join(ROOT, "data/raw/course_names.csv"), encoding="utf-8"))}
 
