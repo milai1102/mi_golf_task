@@ -7,6 +7,7 @@ async def main():
         b = await p.chromium.launch()
         for scheme in ("dark","light"):
             ctx = await b.new_context(viewport={"width":393,"height":683}, device_scale_factor=2, color_scheme=scheme)
+            await ctx.add_init_script("localStorage.setItem('__cad_tap','1')")
             await ctx.add_init_script("if(!localStorage.getItem('mi-caddie')){}")
             pg = await ctx.new_page(); errs=[]; pg.on("pageerror", lambda e: errs.append(str(e)))
             await pg.goto("http://localhost:8765/reports/caddie.html"); await pg.wait_for_timeout(600)
@@ -27,7 +28,7 @@ async def main():
             await cadlib.hole(pg, 2); await pg.wait_for_timeout(500); print("hole2", await st())
             await cadlib.hole(pg, 1); await pg.wait_for_timeout(500); print("hole1", await st())
             await pg.click(".cad-card"); await pg.wait_for_timeout(200); print("round sheet", (await pg.inner_text(".cad-sheet")).replace("\n"," "))
-            await pg.locator(".cad-sheet .shots button").first.click(); await pg.wait_for_timeout(200); await pg.click(".cad-sheet .del"); await pg.wait_for_timeout(300); print("del 1st", await st())
+            await pg.locator(".cad-sheet .acts button").first.click(); await pg.wait_for_timeout(200); await pg.locator(".cad-sheet .shots button").first.click(); await pg.wait_for_timeout(200); await pg.click(".cad-sheet .del"); await pg.wait_for_timeout(300); print("del 1st", await st())
             await pg.screenshot(path=f"/home/claude/shot/f3_{scheme}_full.png", full_page=True)
             print("errs", errs); await ctx.close()
         await b.close()
