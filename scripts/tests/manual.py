@@ -25,8 +25,8 @@ async def one(br, label, **kw):
     st = json.loads(await pg.evaluate("localStorage.getItem('mi-caddie-shots')"))['holes']
     ok = sum(1 for k, r in st.items() if r.get('putts') is not None and r.get('on') is not None and r.get('steps') is not None)
     lg = json.loads(await pg.evaluate("localStorage.getItem('mi-caddie-log')")); sc = sum(1 for e in lg if e['ev'] == 'score')
-    print(f"{label}：記了 {n} 洞，存檔完整 {ok} 洞｜上方：{(await pg.inner_text('.cad-run')).replace(chr(10), ' ')}｜紀錄裡的 score 事件 {sc}｜JS 錯誤 {errs}")
-    await pg.locator("details.cad-day:not(.cad-shots) summary").click(); print("   ", (await pg.inner_text("details.cad-day:not(.cad-shots)")).replace("\n", " ")[:260])
+    print(f"{label}：記了 {n} 洞，存檔完整 {ok} 洞｜上方：{(await pg.inner_text('.cad-card')).replace(chr(10), ' ')}｜紀錄裡的 score 事件 {sc}｜JS 錯誤 {errs}")
+    await pg.click(".cad-card"); await pg.wait_for_timeout(200); print("   ", (await pg.inner_text(".cad-sheet")).replace("\n", " ")[:300])
     await ctx.close(); return ok == 18 and not errs
 async def main():
     async with async_playwright() as p:
