@@ -1,0 +1,21 @@
+name: 下載球洞空拍照片
+on:
+  push:
+    paths: ["data/photos/plan.json", "scripts/fetch_photos.py"]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install pillow
+      - run: python3 scripts/fetch_photos.py
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898699+github-actions[bot]@users.noreply.github.com"
+          git add data/photos
+          git diff --cached --quiet || (git commit -m "下載球洞空拍照片" && git push)
