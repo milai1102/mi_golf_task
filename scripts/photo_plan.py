@@ -3,7 +3,7 @@
 照片由 GitHub Actions（.github/workflows/photos.yml）執行 scripts/fetch_photos.py 下載。"""
 import json, math, sys, pathlib
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-Z_TW, Z_OTHER, MARGIN_YD = 18, 18, 40
+Z_TW, Z_OTHER, MARGIN_YD = 18, 18, 110
 
 def report():
     s = (ROOT / "reports/caddie.html").read_text(encoding="utf-8")

@@ -914,8 +914,8 @@ python3 scripts/build_report.py      # golf.db → reports/index.html（整頁�
 
 - 使用者：球車上系統的球場圖很漂亮，我們的圖不好看；要疊真正的空拍照片，**事先下載存好**（不要上場才抓），先做南寶，之後打過的球場和要去的新球場都先準備好。授權不用管（個人使用），照片角落仍有一行小字註明來源。
 - 照片來源：台灣用國土測繪中心正射影像 `wmts.nlsc.gov.tw/wmts/PHOTO2/default/GoogleMapsCompatible/{z}/{y}/{x}`，國外用 Esri World Imagery。雲端開發環境連不到這兩個網站，所以由 **GitHub Actions** 下載：
-  1. `python3 scripts/photo_plan.py 南寶 [其他簡稱…]`（先跑 `build_report.py`）：從 `reports/caddie.html` 的球洞輪廓範圍（外加 40 碼）和經緯度換算 `H.ll`，算出每洞要哪些圖磚（zoom 18），寫進 `data/photos/plan.json`（鍵是「球場代碼_洞號」）。
-  2. push 之後 `.github/workflows/photos.yml` 自動跑 `scripts/fetch_photos.py`：每洞把圖磚拼成一張 JPEG `data/photos/<球場代碼>_<洞號>.jpg`（約 1000×1300 像素），更新 `data/photos/index.json`，由 github-actions 機器人 commit 回 `main`。已經有的照片不重抓；國土測繪中心抓不到的圖磚改抓 Esri。
+  1. `python3 scripts/photo_plan.py 南寶 [其他簡稱…]`（先跑 `build_report.py`）：從 `reports/caddie.html` 的球洞輪廓範圍（外加 110 碼，旋轉的球洞圖四角才蓋得滿）和經緯度換算 `H.ll`，算出每洞要哪些圖磚（zoom 18），寫進 `data/photos/plan.json`（鍵是「球場代碼_洞號」）。
+  2. push 之後 `.github/workflows/photos.yml` 自動跑 `scripts/fetch_photos.py`：每洞把圖磚拼成一張 JPEG `data/photos/<球場代碼>_<洞號>.jpg`（約 1300×1500 像素），更新 `data/photos/index.json`，由 github-actions 機器人 commit 回 `main`。已經有的照片不重抓；國土測繪中心抓不到的圖磚改抓 Esri。
   3. 之後 `git pull`、重跑 `build_report.py`：`index.json` 會放進桿弟頁（`REPORT.photos`）。
 - 頁面（`drawSaved()`）：有存好的照片就放一張 `<image>`，用圖磚範圍四角的經緯度換算到圖上座標（仿射轉換，球洞圖本身是旋轉的）；照片載入失敗或這一洞沒有存好的照片，改成即時抓圖磚（`drawPhoto()`，手機要有網路）；再失敗就只剩向量圖。照片疊在向量圖上面、路線和落點圈下面，亮度調暗一點讓線條看得清楚。
 - 圖上右上角定位鍵下面有一顆「線圖／照片」切換（`mi-caddie-photo`，預設照片）。

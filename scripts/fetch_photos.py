@@ -21,7 +21,7 @@ def main():
     idx = json.loads((D / "index.json").read_text()) if (D / "index.json").exists() else {}
     for key, p in sorted(plan.items()):
         f = D / f"{key}.jpg"
-        if key in idx and f.exists(): continue
+        if key in idx and f.exists() and all(idx[key].get(k) == p[k] for k in ("z", "ax", "ay", "nx", "ny")): continue
         im = Image.new("RGB", (256 * p["nx"], 256 * p["ny"]), (40, 70, 40)); ok = 0
         for i in range(p["nx"]):
             for j in range(p["ny"]):
