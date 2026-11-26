@@ -1197,7 +1197,7 @@ th{color:var(--ink2);font-weight:500}
 .sclg{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--ink2);padding:10px 0 2px}.sclg span{display:inline-flex;align-items:center;gap:7px}.sclg .m{width:12px;height:12px;border-width:1.5px;outline-width:1.5px;outline-offset:1.5px}
 .tabs{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px}.dtabs{flex-wrap:nowrap;gap:6px}.dtabs .fchip{flex:1 1 0;min-width:0;padding-left:0;padding-right:0;text-align:center;white-space:nowrap}.chart .legend svg,.chart .sclg svg{display:inline-block;width:auto;height:auto;flex:none}.panel .legend{margin-top:10px}.panel{padding:6px 0 4px}
 .maps{display:grid;gap:10px;margin-top:8px}.maps figure{margin:0;background:#0c0c0b;border-radius:10px;padding:6px 4px 4px;min-width:0}.maps figcaption{font-size:12px;color:#c3c2b7;text-align:center;padding-bottom:2px;white-space:nowrap}
-.maps svg{display:block;width:100%}.maps.strip{width:calc(100vw - 46px);display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;gap:8px;padding-bottom:6px}.maps.strip figure{flex:0 0 calc((100% - (var(--per) - 1) * 8px) / var(--per));scroll-snap-align:start}.sub{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:12px;color:var(--ink2);margin-top:6px}.sub .fchip{font-size:12px;padding:2px 10px}
+.maps svg{display:block;width:100%}.maps figure{position:relative}.maps .mtl{position:absolute;left:10px;top:8px;display:flex;flex-direction:column;color:#fff;text-shadow:0 1px 3px #000,0 0 2px #000;pointer-events:none;line-height:1.1}.maps .mtl .z{font-size:13px;color:#d9d9d9}.maps .mtl b{font-size:28px;font-weight:900}.maps .mtl span{font-size:15px;font-weight:700}.maps .mbr{position:absolute;right:8px;bottom:8px;background:rgba(0,0,0,.66);border-radius:10px;padding:6px 10px;color:#fff;min-width:96px}.maps .mbr .hd{display:flex;flex-direction:column;border-bottom:1px solid rgba(255,255,255,.25);padding-bottom:3px;margin-bottom:3px}.maps .mbr .hd b{font-size:18px;color:#fff}.maps .mbr .hd span{font-size:12px;color:#ddd}.maps .mbr .r{display:flex;align-items:baseline;gap:6px;font-size:17px;font-weight:800;line-height:1.35}.maps .mbr .r i{font-style:normal;font-size:14px;color:#ccc}.maps .mbr .r span{margin-left:auto}.maps.strip{width:calc(100vw - 46px);display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;gap:8px;padding-bottom:6px}.maps.strip figure{flex:0 0 calc((100% - (var(--per) - 1) * 8px) / var(--per));scroll-snap-align:start}.sub{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:12px;color:var(--ink2);margin-top:6px}.sub .fchip{font-size:12px;padding:2px 10px}
 .ptabs{display:flex;margin:16px 0 4px;border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:4px;gap:4px}.ptabs a{flex:1;text-align:center;font-size:15px;font-weight:600;color:var(--ink2);text-decoration:none;padding:9px 6px;border-radius:9px;white-space:nowrap}.ptabs a.on{background:var(--ink);color:var(--surface)}
 nav{margin:10px 0 0}nav a{font-size:12px;padding:3px 10px}
 .morelink{display:block;margin:20px 0 0;font-size:15px}.morelink a{display:inline-block;padding:8px 16px;border:1px solid var(--axis);border-radius:999px;color:var(--ink);text-decoration:none}
@@ -1987,20 +1987,31 @@ DRAW.roundlist = (sec, host) => {
       if (!thin) { el("circle", { cx: s[4], cy: s[5], r: 4.2 * k, fill: c, stroke: "#111", "stroke-width": 1 * k }, svg).appendChild(el("title", {}, null, `${s[0]} ${s[6]} 碼`)); } });
     if (H.pin) { const [px, py] = H.pin; el("line", { x1: px, y1: py, x2: px, y2: py - 16 * k, stroke: "#fff", "stroke-width": 1.5 * k }, svg); el("polygon", { points: `${px},${py - 16 * k} ${px + 9 * k},${py - 12.5 * k} ${px},${py - 9 * k}`, fill: "#ff3b3b" }, svg); }
     return fig; };
-  const mapPanel = (r, host) => { const strip = NARROW(); let per = strip || WIDE_R() ? 2 : 3, start = 0;   // 手機：全部的洞排成一橫列，左右滑動
-    const HS = r.gps.holes, sizes = strip ? [1, 2, 3] : [2, 3];
-    const s1 = h("div", "sub", host), s2 = h("div", "sub", host), grid = h("div", "maps", host), lg = h("div", "legend", host);
+  const holeMap1 = (r, H, hpx) => { const geo = (REPORT.geo[H.cid] || {})[H.h] || {}, fig = document.createElement("figure"), row = r.holes[H.n - 1] || [], st = row[6], putts = row[4];
+    const par = H.par || row[1], zone = r.parts && r.parts[H.n - 1] ? `${r.parts[H.n - 1]} ${H.h}` : `第 ${H.n} 洞`, len = r.len && r.len[H.n];
+    const pts = [].concat(...(geo.outline || []), ...H.shots.map(s => [[s[2], s[3]], [s[4], s[5]]]), H.pin ? [H.pin] : []), xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+    if (!pts.length) return fig;
+    const pad = geo.outline ? 10 : 40, x0 = Math.min(...xs) - pad, y0 = Math.min(...ys) - pad, w = Math.max(...xs) - x0 + pad, hh = Math.max(...ys) - y0 + pad, k = Math.max(w, hh) / 300;
+    const svg = el("svg", { viewBox: `${x0} ${y0} ${w} ${hh}`, style: `height:${hpx}px`, preserveAspectRatio: "xMidYMid meet" }, fig);
+    drawCourse(svg, geo);
+    H.shots.forEach((s, i) => { const c = SHOTC[s[1]], thin = s[1] === "c";
+      el("line", { x1: s[2], y1: s[3], x2: s[4], y2: s[5], stroke: c, "stroke-width": (thin ? 1.2 : 2.4) * k, "stroke-opacity": thin ? 0.7 : 1, "stroke-linecap": "round" }, svg);
+      if (!thin) el("circle", { cx: s[4], cy: s[5], r: 4.2 * k, fill: c, stroke: "#111", "stroke-width": 1 * k }, svg); });
+    if (H.pin) { const [px, py] = H.pin; el("line", { x1: px, y1: py, x2: px, y2: py - 16 * k, stroke: "#fff", "stroke-width": 1.5 * k }, svg); el("polygon", { points: `${px},${py - 16 * k} ${px + 9 * k},${py - 12.5 * k} ${px},${py - 9 * k}`, fill: "#ff3b3b" }, svg); }
+    const tl = h("div", "mtl", fig); h("span", "z", tl, zone); h("b", "", tl, len ? `${len} 碼` : `Par ${par}`); if (len) h("span", "", tl, `Par ${par}`);
+    const AB = REPORT.abbr || {}, ab = c => AB[c] || String(c).replace(/^(\d)鐵$/, "$1i").replace(/^(\d\d)度$/, "$1°"), NUMS = "①②③④⑤⑥⑦⑧⑨⑩", br = h("div", "mbr", fig);
+    if (st) { const dv = st - par, hd = h("div", "hd", br); h("b", "", hd, `${st} 桿（${dv > 0 ? "+" + dv : dv === 0 ? "Par" : "−" + (-dv)}）`); if (putts != null) h("span", "", hd, `${putts} 推`); }
+    H.shots.forEach((s, i) => { const rr = h("div", "r", br); h("i", "", rr, NUMS[i] || i + 1); const cb = h("b", "", rr, ab(s[0])); cb.style.color = SHOTC[s[1]] === undefined ? "" : SHOTC[s[1]]; h("span", "", rr, String(s[6])); });
+    return fig; };
+  const mapPanel = (r, host) => { const HS = r.gps.holes, narrow = NARROW(), s2 = h("div", "sub", host), grid = h("div", "maps strip" + (narrow ? "" : " big"), host), lg = h("div", "legend", host);
+    grid.style.setProperty("--per", 1);
     lg.innerHTML = [["d", "一號木"], ["w", "鐵木桿"], ["i", "鐵桿"]].map(([c, t]) => `<span><svg width="20" height="14"><line x1="1" y1="7" x2="13" y2="7" stroke="${SHOTC[c]}" stroke-width="2.4"/><circle cx="15" cy="7" r="3.6" fill="${SHOTC[c]}"/></svg>${t}</span>`).join("") +
       `<span><svg width="20" height="14"><line x1="1" y1="7" x2="19" y2="7" stroke="var(--ink2)" stroke-width="1.2"/></svg>切球桿</span>`;
-    const draw = () => { s1.replaceChildren(); s2.replaceChildren(); grid.replaceChildren(); h("span", "", s1, "一次看");
-      sizes.forEach(n => { const b = h("button", "fchip" + (n === per ? " on" : ""), s1, n >= HS.length ? "全部" : n + " 洞"); b.addEventListener("click", () => { per = n; start = 0; draw(); }); });
-      if (strip) { h("span", "", s2, "↔ 左右滑動看下一洞"); grid.className = "maps strip"; grid.style.setProperty("--per", per);
-        const hpx = per === 1 ? 500 : per === 2 ? 400 : 300; HS.forEach(H => grid.appendChild(holeMap(r, H, hpx, per === 3))); grid.scrollLeft = 0; return; }
-      if (per < HS.length) for (let i = 0; i < HS.length; i += per) { const b = h("button", "fchip" + (i === start ? " on" : ""), s2, `${HS[i].n}–${HS[Math.min(i + per, HS.length) - 1].n}`); b.addEventListener("click", () => { start = i; draw(); }); }
-      const show = HS.slice(start, start + per), cols = per;
-      grid.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`; const hpx = per === 2 ? 560 : 500;
-      show.forEach(H => grid.appendChild(holeMap(r, H, hpx, per === 3 && WIDE_R()))); };
-    draw(); };
+    const figs = HS.map(H => grid.appendChild(holeMap1(r, H, narrow ? 520 : 600)));
+    if (narrow) h("span", "", s2, "↔ 左右滑動看下一洞");
+    else { const bs = HS.map((H, i) => { const b = h("button", "fchip" + (i ? "" : " on"), s2, String(H.n)); b.addEventListener("click", () => grid.scrollTo({ left: figs[i].offsetLeft - grid.offsetLeft, behavior: "smooth" })); return b; });
+      grid.addEventListener("scroll", () => { const i = Math.round(grid.scrollLeft / Math.max(1, grid.clientWidth)); bs.forEach((b, k) => b.classList.toggle("on", k === i)); }); }
+    grid.scrollLeft = 0; };
   // 點開一場：計分卡在上，下面一排按鈕選要看的細節
   const detail = r => { const box = document.createElement("div"); h("div", "scname", box, r.course + (WIDE_R() ? "　" + r.date : "")); box.appendChild(card(r));
     const tabs = h("div", "tabs dtabs", box), panel = h("div", "panel", box); let open = null;
