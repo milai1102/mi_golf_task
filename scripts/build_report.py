@@ -5,7 +5,9 @@
 用法：python3 scripts/build_report.py
 """
 import csv, datetime, glob, json, os, shutil, sqlite3, statistics, tempfile
-import math
+import math, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import merge_shots   # 手錶與網站兩個來源的擊球合併
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB, OUT = os.path.join(ROOT, "data/processed/golf.db"), os.path.join(ROOT, "reports/index.html")
@@ -555,8 +557,30 @@ def round_gps(fname):
                 if cat == "d" and int(c[0]) == 1:                                   # 只算開球那一桿
                     fo = fairway_offset(sp, ep, int(c[3]), GEO.get(cur["cid"], {}).get(str(cur["h"]), {}).get("fairway", []))
                     drive.append({"hole": seq, "yd": yd, "width": fo[0] if fo else None, "off": fo[1] if fo else None, "fw": e[4] == "Fairway"})
+    if holes and (rows[0]["date"], merge_shots.SHORT.get(rows[0]["course"], rows[0]["course"])) in merge_shots.caddie_files():
+        M = merge_shots.merge_round(fname, rows); fit = _geofit()               # 這一場網站也有記：每一洞的擊球換成兩個來源合併後的版本
+        for cur in holes:
+            mg = M.get(cur["n"]); ll = fit.get((cur["cid"], cur["h"]))
+            if not mg: continue
+            def px(q, ll=ll):
+                if not q or not ll: return None
+                return (round(ll[2] * (q[1] - ll[1]) + ll[3] * (q[0] - ll[0]) + ll[4]), round(ll[5] * (q[1] - ll[1]) + ll[6] * (q[0] - ll[0]) + ll[7]))
+            ms = mg["shots"]; pts = [x["sp"] or px(x["s"]) for x in ms]; pinp = tuple(cur["pin"]) if cur["pin"] else None; new = []
+            for k, x in enumerate(ms):
+                sp = pts[k]; ep = pts[k + 1] if k + 1 < len(ms) else (pinp or x["ep"])
+                if not sp or not ep: continue
+                club = x["club"]; cat = "d" if club == DRIVER else "c" if roles.get(club) == "chip" else "w" if (club in WOODS or "木" in club) else "i"
+                el = x["elie"] if x["src"] != "site" and not (k + 1 < len(ms) and ms[k + 1]["src"] == "site") else ("Green" if k + 1 == len(ms) else "")
+                new.append([club, cat, sp[0], sp[1], ep[0], ep[1], round(x["dist_m"] * 1.09361) if x["dist_m"] is not None else 0, el or "", x["src"]])
+            cur["shots"] = new
     holes.sort(key=lambda h: h["n"]); drive.sort(key=lambda d: d["hole"])
     return {"holes": holes, "drive": drive} if holes else None
+
+_GEOFIT = None
+def _geofit():
+    global _GEOFIT
+    if _GEOFIT is None: _GEOFIT = caddie_geofit()
+    return _GEOFIT
 
 def section_courses(con):
     """球場紀錄：每個球場、每一洞把歷次打過的路線疊在一起，下場前或打完檢討用。"""
@@ -981,10 +1005,10 @@ def section_roundlist(con):
         return [[c, med([rid], c), med(prev[-RECENT_N:], c), med(prev, c)] for c in CLUBS if med([rid], c)]
     for rid, date, course, cat, n, strokes, over, diff, short, fname in con.execute("SELECT round_id, date, course, category, holes_played, strokes, over_par, differential, course_short, file FROM rounds ORDER BY date DESC"):
         holes = []
-        for seq, hole, par, st, putts, src, yd, pen, on in con.execute("SELECT seq, hole, par, strokes, putts, putts_source, length_yd, penalties, strokes_to_green FROM holes WHERE round_id=? ORDER BY seq", (rid,)):
-            shots = con.execute("SELECT club, distance_yd FROM shots WHERE round_id=? AND seq=? AND shot_type != 'PUTT' ORDER BY shot_no", (rid, seq)).fetchall()
-            miss = max(0, st - len(shots) - putts - (pen or 0)) if putts is not None and st else 0
-            holes.append([hole, par, yd, [[c or "?", d] for c, d in shots], putts, src == "estimated", st, pen or 0, on, miss])
+        for seq, hole, par, st, putts, src, yd, pen, on, unrec in con.execute("SELECT seq, hole, par, strokes, putts, putts_source, length_yd, penalties, strokes_to_green, unrecorded FROM holes WHERE round_id=? ORDER BY seq", (rid,)):
+            shots = con.execute("SELECT club, distance_yd, source, watch_club FROM shots WHERE round_id=? AND seq=? AND shot_type != 'PUTT' ORDER BY shot_no", (rid, seq)).fetchall()
+            miss = unrec or 0
+            holes.append([hole, par, yd, [[c or "?", d, sr if sr == "site" else "", wc or ""] for c, d, sr, wc in shots], putts, src == "estimated", st, pen or 0, on, miss])
         pv = [h[4] for h in holes if h[4] is not None]
         out.append({"date": date, "course": course, "short": short, "tag": tags.get(cat, ""), "cat": {"full_18": "full", "short_course": "short"}.get(cat, "partial"), "n": n, "strokes": strokes, "over": over, "hcp": diff,
                     "putts": sum(pv) if pv else None, "est": any(h[5] for h in holes), "holes": holes, "len": {seq: round(yd) for seq, yd in con.execute("SELECT seq, length_yd FROM holes WHERE round_id=? AND length_yd>0", (rid,))}, "clubs": club_table(rid), "gps": round_gps(fname), "parts": round_parts(fname)[0], "combo": round_parts(fname)[1]})
@@ -1164,7 +1188,7 @@ section h2{font-size:18px;font-weight:600;margin:0 0 4px}
 .tip div span:last-child{color:var(--ink)}
 select{font:inherit;font-size:14px;padding:6px 10px;border:1px solid var(--axis);border-radius:8px;background:var(--surface);color:var(--ink);margin-bottom:8px;max-width:100%}
 .rt{width:100%}.rt td,.rt th{text-align:center;padding:6px 8px}.rt td.shots{text-align:left}
-.chip{display:inline-block;border:1px solid var(--border);border-radius:6px;padding:1px 7px;margin:2px 4px 2px 0;font-size:12px;white-space:nowrap}.chip b{font-weight:500}.chip span{color:var(--ink2)}.chip.miss{border-style:dashed;color:var(--ink3,#999)}.chip.miss b{font-weight:700}.chip.pen{border-color:#4a90d9}
+.chip{display:inline-block;border:1px solid var(--border);border-radius:6px;padding:1px 7px;margin:2px 4px 2px 0;font-size:12px;white-space:nowrap}.chip b{font-weight:500}.chip span{color:var(--ink2)}.chip.miss{border-style:dashed;color:var(--ink3,#999)}.chip.site{border-color:#3fae5a;border-width:1.5px}.chip.miss b{font-weight:700}.chip.pen{border-color:#4a90d9}
 .rt td.bad{color:#d03b3b;font-weight:600}.rt td.good{color:#0c8a0c;font-weight:600}.rt tr.tot td{font-weight:600;border-top:1px solid var(--axis)}.rt tr.nine td{border-bottom:2px solid var(--axis);background:color-mix(in srgb,var(--ink) 6%,transparent)}
 .rl{width:100%}.rl th,.rl td{text-align:center;padding:8px 8px}.rl td.course,.rl th:nth-child(2){text-align:left}.rl td.strong{font-weight:600}.rl td.zero{color:var(--up);font-weight:600}
 .rl tr.row{cursor:pointer}.rl tr.row:hover{background:var(--page)}.rl tr.more{display:none}.rl.all tr.more{display:table-row}.rl td.arrow{color:var(--muted);width:28px}
@@ -1198,7 +1222,7 @@ th{color:var(--ink2);font-weight:500}
 .sclg{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--ink2);padding:10px 0 2px}.sclg span{display:inline-flex;align-items:center;gap:7px}.sclg .m{width:12px;height:12px;border-width:1.5px;outline-width:1.5px;outline-offset:1.5px}
 .tabs{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px}.dtabs{flex-wrap:nowrap;gap:6px}.dtabs .fchip{flex:1 1 0;min-width:0;padding-left:0;padding-right:0;text-align:center;white-space:nowrap}.chart .legend svg,.chart .sclg svg{display:inline-block;width:auto;height:auto;flex:none}.panel .legend{margin-top:10px}.panel{padding:6px 0 4px}
 .maps{display:grid;gap:10px;margin-top:8px}.maps figure{margin:0;background:#0c0c0b;border-radius:10px;padding:6px 4px 4px;min-width:0}.maps figcaption{font-size:12px;color:#c3c2b7;text-align:center;padding-bottom:2px;white-space:nowrap}
-.maps svg{display:block;width:100%}.maps figure{position:relative}.maps .mtl{position:absolute;left:10px;top:8px;display:flex;flex-direction:column;color:#fff;text-shadow:0 1px 3px #000,0 0 2px #000;pointer-events:none;line-height:1.1}.maps .mtl .z{font-size:13px;color:#d9d9d9}.maps .mtl b{font-size:28px;font-weight:900}.maps .mtl span{font-size:15px;font-weight:700}.maps .mbr{position:absolute;right:8px;bottom:8px;background:rgba(0,0,0,.66);border-radius:10px;padding:6px 10px;color:#fff;min-width:96px}.maps .mbr .hd{display:flex;flex-direction:column;border-bottom:1px solid rgba(255,255,255,.25);padding-bottom:3px;margin-bottom:3px}.maps .mbr .hd b{font-size:18px;color:#fff}.maps .mbr .hd span{font-size:12px;color:#ddd}.maps .mbr .r{display:flex;align-items:baseline;gap:6px;font-size:17px;font-weight:800;line-height:1.35}.maps .mbr .r i{font-style:normal;font-size:14px;color:#ccc}.maps .mbr .r span{margin-left:auto}.maps .mbr .r.miss b{color:#bbb;font-weight:600;font-size:14px}.maps.strip{width:calc(100vw - 46px);display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;gap:8px;padding-bottom:6px}.maps.strip figure{flex:0 0 calc((100% - (var(--per) - 1) * 8px) / var(--per));scroll-snap-align:start}.sub{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:12px;color:var(--ink2);margin-top:6px}.sub .fchip{font-size:12px;padding:2px 10px}
+.maps svg{display:block;width:100%}.maps figure{position:relative}.maps .mtl{position:absolute;left:10px;top:8px;display:flex;flex-direction:column;color:#fff;text-shadow:0 1px 3px #000,0 0 2px #000;pointer-events:none;line-height:1.1}.maps .mtl .z{font-size:13px;color:#d9d9d9}.maps .mtl b{font-size:28px;font-weight:900}.maps .mtl span{font-size:15px;font-weight:700}.maps .mbr{position:absolute;right:8px;bottom:8px;background:rgba(0,0,0,.66);border-radius:10px;padding:6px 10px;color:#fff;min-width:96px}.maps .mbr .hd{display:flex;flex-direction:column;border-bottom:1px solid rgba(255,255,255,.25);padding-bottom:3px;margin-bottom:3px}.maps .mbr .hd b{font-size:18px;color:#fff}.maps .mbr .hd span{font-size:12px;color:#ddd}.maps .mbr .r{display:flex;align-items:baseline;gap:6px;font-size:17px;font-weight:800;line-height:1.35}.maps .mbr .r i{font-style:normal;font-size:14px;color:#ccc}.maps .mbr .r span{margin-left:auto}.maps .mbr .r.site i{color:#5fd07a}.maps .mbr .r.miss b{color:#bbb;font-weight:600;font-size:14px}.maps.strip{width:calc(100vw - 46px);display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;gap:8px;padding-bottom:6px}.maps.strip figure{flex:0 0 calc((100% - (var(--per) - 1) * 8px) / var(--per));scroll-snap-align:start}.sub{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:12px;color:var(--ink2);margin-top:6px}.sub .fchip{font-size:12px;padding:2px 10px}
 .ptabs{display:flex;margin:16px 0 4px;border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:4px;gap:4px}.ptabs a{flex:1;text-align:center;font-size:15px;font-weight:600;color:var(--ink2);text-decoration:none;padding:9px 6px;border-radius:9px;white-space:nowrap}.ptabs a.on{background:var(--ink);color:var(--surface)}
 nav{margin:10px 0 0}nav a{font-size:12px;padding:3px 10px}
 .morelink{display:block;margin:20px 0 0;font-size:15px}.morelink a{display:inline-block;padding:8px 16px;border:1px solid var(--axis);border-radius:999px;color:var(--ink);text-decoration:none}
@@ -1901,7 +1925,7 @@ DRAW.caddie = (sec, host) => { const CL = REPORT.clubs || {};
   selC.addEventListener("change", () => { ci = +selC.value; li = 0; hi = 0; play = null; pickHole(); });
   selL.addEventListener("change", () => { li = +selL.value; hi = 0; play = null; pickHole(); });
   const logBox = parent => { const row = h("div", "cad-log", parent), lab = h("span", "", row), bS = h("button", "", row, "匯出檔案"), bC = h("button", "", row, "複製"), bX = h("button", "x", null, "清除"), msg = h("div", "lm", row); let armed = 0;
-    const pack = () => JSON.stringify({ app: "mi-caddie-log", ver: 1, exported: new Date().toISOString(), built: (document.querySelector(".pmeta") || {}).textContent || "", ua: navigator.userAgent, screen: [innerWidth, innerHeight, devicePixelRatio], day: tstore(), log: logRead() });
+    const pack = () => JSON.stringify({ app: "mi-caddie-log", ver: 1, exported: new Date().toISOString(), built: (document.querySelector(".pmeta") || {}).textContent || "", ua: navigator.userAgent, screen: [innerWidth, innerHeight, devicePixelRatio], day: tstore(), cids: (() => { const o = {}; try { Object.keys(tstore().holes || {}).forEach(k => { const [sh, j, hh] = k.split("|"), C = sec.data.find(x => x.short === sh), L = C && C.layouts[+j]; if (L) o[k] = L.cid + "_" + hh; }); } catch (e) {} return o; })(), log: logRead() });
     logUI = () => { const a = logRead(); lab.textContent = "測試紀錄 " + a.length + " 筆" + (a.length ? "（" + a[0].t.slice(5, 10) + " 起）" : ""); };
     const fname = () => "caddie_log_" + new Date().toISOString().slice(0, 10) + ".json", say = t => { msg.textContent = t; };
     const down = txt => { const u = URL.createObjectURL(new Blob([txt], { type: "application/json" })), a = document.createElement("a"); a.href = u; a.download = fname(); document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 4000); say("已下載 " + fname()); };
@@ -2002,7 +2026,7 @@ DRAW.roundlist = (sec, host) => {
     const tl = h("div", "mtl", fig); h("span", "z", tl, zone); h("b", "", tl, len ? `${len} 碼` : `Par ${par}`); if (len) h("span", "", tl, `Par ${par}`);
     const AB = REPORT.abbr || {}, ab = c => AB[c] || String(c).replace(/^(\d)鐵$/, "$1i").replace(/^(\d\d)度$/, "$1°"), NUMS = "①②③④⑤⑥⑦⑧⑨⑩", br = h("div", "mbr", fig);
     if (st) { const dv = st - par, hd = h("div", "hd", br); h("b", "", hd, `${st} 桿（${dv > 0 ? "+" + dv : dv === 0 ? "Par" : "−" + (-dv)}）`); if (putts != null) h("span", "", hd, row[8] != null ? `${row[8]} ON ${putts} 推` : `${putts} 推`); }
-    H.shots.forEach((s, i) => { const rr = h("div", "r", br); h("i", "", rr, NUMS[i] || i + 1); const cb = h("b", "", rr, ab(s[0])); cb.style.color = SHOTC[s[1]] === undefined ? "" : SHOTC[s[1]]; h("span", "", rr, String(s[6])); });
+    H.shots.forEach((s, i) => { const rr = h("div", "r" + (s[8] === "site" ? " site" : ""), br); h("i", "", rr, NUMS[i] || i + 1); const cb = h("b", "", rr, ab(s[0])); cb.style.color = SHOTC[s[1]] === undefined ? "" : SHOTC[s[1]]; h("span", "", rr, String(s[6])); });
     if (row[7]) { const rr = h("div", "r", br); h("i", "", rr, "罰"); h("b", "", rr, row[7] + " 桿"); }
     if (row[9]) { const rr = h("div", "r miss", br); h("i", "", rr, "?"); h("b", "", rr, `漏記 ${row[9]} 桿`); }
     return fig; };
@@ -2033,14 +2057,14 @@ DRAW.roundlist = (sec, host) => {
     const AB = REPORT.abbr || {}, ab = c => AB[c] || String(c).replace(/^(\d)鐵$/, "$1i").replace(/^(\d\d)度$/, "$1°");
     r.holes.forEach(([hole, par, yd, shots, putts, est, st, pen, on, miss], i) => { const tr = h("tr", "", tb);
       h("td", "", tr, hole); h("td", "", tr, par); h("td", "", tr, yd || ""); const td = h("td", "shots", tr);
-      shots.forEach(([c, dd]) => { const b = h("span", "chip", td); h("b", "", b, ab(c)); h("span", "", b, " " + dd); b.title = c; });
+      shots.forEach(([c, dd, sr, wc]) => { const b = h("span", "chip" + (sr === "site" ? " site" : ""), td); h("b", "", b, ab(c)); h("span", "", b, " " + (dd == null ? "" : dd)); b.title = sr === "site" ? c + "（網站補的，手錶沒記到）" : wc ? c + "（手錶記成 " + wc + "）" : c; });
       if (pen) { const b = h("span", "chip pen", td); h("b", "", b, "罰"); h("span", "", b, " " + pen); }
       for (let k = 0; k < (miss || 0); k++) { const b = h("span", "chip miss", td); h("b", "", b, "?"); b.title = "手錶沒記到"; }
       h("td", "", tr, on == null ? "" : on); h("td", "", tr, putts == null ? "" : putts); h("td", "", tr, st);
       const dv = st - par; h("td", dv >= 3 ? "bad" : dv <= 0 ? "good" : "", tr, dv > 0 ? "+" + dv : dv === 0 ? "E" : dv);
       if (r.holes.length > 9 && (i % 9 === 8 || i === r.holes.length - 1)) { const k = i - i % 9, part = r.holes.slice(k, i + 1), t2 = h("tr", "tot nine", tb), nm = h("td", "", t2, r.parts && r.parts[k] ? r.parts[k] : k === 0 ? "前九" : k === 9 ? "後九" : ""); nm.colSpan = 4; nm.style.textAlign = "left";
         h("td", "", t2, part.every(x => x[8] != null) ? part.reduce((a, x) => a + x[8], 0) : ""); h("td", "", t2, part.every(x => x[4] != null) ? part.reduce((a, x) => a + x[4], 0) : ""); h("td", "", t2, part.reduce((a, x) => a + x[6], 0)); h("td", "", t2, ""); } });
-    h("p", "note", box, "1W 一號木　H 鐵木　6i 六鐵　單位：碼　？＝手錶沒記到的一桿　ON＝幾桿上果嶺（手記）");
+    h("p", "note", box, "1W 一號木　H 鐵木　6i 六鐵　單位：碼　綠框＝手錶沒記到、網站補上的一桿　？＝兩邊都沒記到　ON＝幾桿上果嶺");
     return box; };
   const T = sec.targets || {}, full = r => r.cat === "full";
   const FLAT = 2, FULL = sec.data.filter(full), F5 = FULL.slice(0, 5), AVG5 = F5.length ? F5.reduce((a, r) => a + r.strokes, 0) / F5.length : null;

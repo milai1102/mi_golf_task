@@ -3,7 +3,9 @@
 資料庫是衍生物，隨時可刪掉重建；任何修正都改 data/rounds 的檔案，不要改資料庫。
 用法：python3 scripts/build_db.py
 """
-import csv, glob, json, os, shutil, sqlite3, tempfile
+import csv, glob, json, os, shutil, sqlite3, sys, tempfile
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from merge_shots import merge_round   # 手錶與網站兩個來源的擊球，在這裡合併（見 merge_shots.py）
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ROUNDS, OUT = os.path.join(ROOT, "data/rounds"), os.path.join(ROOT, "data/processed")
@@ -45,7 +47,8 @@ CREATE TABLE holes(round_id INTEGER, seq INTEGER, hole INTEGER, layout TEXT, par
   putts INTEGER, putts_source TEXT, unrecorded INTEGER, penalties INTEGER, fairway TEXT, length_m INTEGER, length_yd INTEGER,
   shots_recorded INTEGER, strokes_to_green INTEGER, first_putt_steps INTEGER, PRIMARY KEY(round_id, seq));
 CREATE TABLE shots(round_id INTEGER, seq INTEGER, shot_no INTEGER, club TEXT, shot_type TEXT, start_lie TEXT, end_lie TEXT,
-  distance_m INTEGER, distance_yd INTEGER, to_pin_start_m INTEGER, to_pin_end_m INTEGER);
+  distance_m INTEGER, distance_yd INTEGER, to_pin_start_m INTEGER, to_pin_end_m INTEGER,
+  source TEXT, watch_club TEXT);   -- source：garmin 只有手錶／site 只有網站（手錶漏記）／both 兩邊都有；watch_club：兩邊球桿不同時手錶記的球桿
 """)
 problems = []
 for rid, path in enumerate(sorted(glob.glob(os.path.join(ROUNDS, "*.csv"))), 1):
@@ -57,18 +60,33 @@ for rid, path in enumerate(sorted(glob.glob(os.path.join(ROUNDS, "*.csv"))), 1):
         holes.setdefault(seq, (key, r, []))
         if r["shot_no"]: holes[seq][2].append(r)
     layouts = list(dict.fromkeys(r["layout"] for r in rows))
+    M = merge_round(fname, rows)
     tot = par = nshots = adj = 0; has_putts = 0
+    LIE = {"T": "TeeBox", "F": "Fairway", "R": "Rough", "B": "Bunker", "W": "Water"}
     for seq, (_, r, ss) in sorted(holes.items()):
         st, p = int(r["hole_strokes"]), int(r["par"]); putts, pen, m = n(r["putts"]), n(r["penalties"]), n(r["hole_length_m"])
-        tot += st; par += p; nshots += len(ss); adj += min(st, p + HOLE_CAP); has_putts |= r["putts_source"] in ("garmin", "manual")
-        nonputt = sum(1 for s in ss if s["shot_type"] != "PUTT")
-        unrec = None if putts is None else max(st - nonputt - (pen or 0) - putts, 0)   # 手錶漏記的擊球數
-        con.execute("INSERT INTO holes VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (rid, seq, int(r["hole"]), r["layout"], p, st, st - p, putts, r["putts_source"], unrec,
-            pen, r["fairway"], m, round(m * YD) if m else None, len(ss), int(r["strokes_to_green"]) if r.get("strokes_to_green") else None, int(r["first_putt_steps"]) if r.get("first_putt_steps") else None))
-        for s in ss:
-            d = n(s["distance_m"])
-            con.execute("INSERT INTO shots VALUES(?,?,?,?,?,?,?,?,?,?,?)", (rid, seq, int(s["shot_no"]), s["club"], s["shot_type"],
-                s["start_lie"], s["end_lie"], d, round(d * YD), n(s["to_pin_start_m"]), n(s["to_pin_end_m"])))
+        src, on, steps = r["putts_source"], n(r.get("strokes_to_green")), n(r.get("first_putt_steps"))
+        mg = M.get(seq, {"shots": [], "hole": {}}); ms, mh = mg["shots"], mg["hole"]
+        if src != "manual" and mh.get("putts") is not None:          # 網站記的成績（場次檔的人工修正優先）
+            putts, src = mh["putts"], "manual"
+            on = mh["on"] if mh.get("on") is not None else on; steps = mh["steps"] if mh.get("steps") is not None else steps
+        if pen is None and any(x["pen"] for x in ms): pen = sum(x["pen"] for x in ms)
+        tot += st; par += p; nshots += len(ms); adj += min(st, p + HOLE_CAP); has_putts |= src in ("garmin", "manual")
+        unrec = None if putts is None else max(st - len(ms) - (pen or 0) - putts, 0)   # 合併兩個來源之後仍然沒記到的擊球數
+        con.execute("INSERT INTO holes VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (rid, seq, int(r["hole"]), r["layout"], p, st, st - p, putts, src, unrec,
+            pen, r["fairway"], m, round(m * YD) if m else None, len(ms), on, steps))
+        for k, x in enumerate(ms):
+            row, nxt = x["row"], ms[k + 1] if k + 1 < len(ms) else None
+            if row and not (nxt and nxt["src"] == "site") and not (not nxt and row is not None and x["src"] != "garmin" and False):
+                d, ps, pe = n(row["distance_m"]), n(row["to_pin_start_m"]), n(row["to_pin_end_m"])
+                stype, sl, el = row["shot_type"], row["start_lie"], row["end_lie"]
+            else:                                                        # 只有網站的一桿，或後面接著手錶漏記的一桿：距離由兩桿的起點重算
+                d, ps, pe = x["dist_m"], x["pin_s"], x["pin_e"]
+                sl = row["start_lie"] if row else LIE.get(x["lie"], "Unknown")
+                el = LIE.get(nxt["lie"], "Unknown") if nxt and nxt["lie"] else (nxt["row"]["start_lie"] if nxt and nxt["row"] else "Green" if not nxt else "Unknown")
+                stype = row["shot_type"] if row else ("TEE" if k == 0 else "CHIP" if ps is not None and ps <= 55 else "APPROACH")
+            con.execute("INSERT INTO shots VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)", (rid, seq, k + 1, x["club"], stype, sl, el, d, round(d * YD) if d is not None else None,
+                ps, pe, x["src"], x["conflict"]))
     course = rows[0]["course"]; k = len(holes)
     cat = "short_course" if course in SHORT_COURSES else "full_18" if k == 18 else "nine" if k == 9 else "partial"
     rating, slope, approx = rating_of(fname, list(dict.fromkeys(r["garmin_scorecard_id"] for r in rows))) if cat == "full_18" else (None, None, 0)
