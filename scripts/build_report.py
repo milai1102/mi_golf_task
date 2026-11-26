@@ -74,7 +74,7 @@ def section_club_distance(con):
     roles = club_roles()
     recent = {r[0] for r in con.execute("SELECT round_id FROM rounds ORDER BY date DESC LIMIT 10")}
     rows = con.execute("""SELECT club, distance_yd, shot_type, round_id FROM shots
-        WHERE shot_type != 'PUTT' AND club NOT IN ('','Putter','已刪除球桿','未知球桿')""").fetchall()
+        WHERE shot_type != 'PUTT' AND distance_yd IS NOT NULL AND club NOT IN ('','Putter','已刪除球桿','未知球桿')""").fetchall()
     by, by_recent = {}, {}
     for club, yd, st, rid in rows:
         if rid in recent and not (roles.get(club, "full") in ("full", "practice") and st in ("CHIP", "RECOVERY")): by_recent.setdefault(club, []).append(yd)
@@ -216,7 +216,7 @@ def section_club_recent(con):
     roles = club_roles()
     recent = {r[0] for r in con.execute("SELECT round_id FROM rounds ORDER BY date DESC LIMIT ?", (RECENT_N,))}
     rows = con.execute("""SELECT club, distance_yd, shot_type, round_id FROM shots
-        WHERE shot_type != 'PUTT' AND club NOT IN ('','Putter','已刪除球桿','未知球桿')""").fetchall()
+        WHERE shot_type != 'PUTT' AND distance_yd IS NOT NULL AND club NOT IN ('','Putter','已刪除球桿','未知球桿')""").fetchall()
     by = {}
     for club, yd, st, rid in rows:
         if roles.get(club, "full") in ("full", "practice") and st in ("CHIP", "RECOVERY"): continue
@@ -250,7 +250,7 @@ def classified_shots(con):
     rows = con.execute("""SELECT s.round_id, s.seq, s.shot_no, s.club, s.shot_type, s.distance_yd, s.to_pin_start_m, s.to_pin_end_m,
             s.shot_no = (SELECT MAX(shot_no) FROM shots x WHERE x.round_id = s.round_id AND x.seq = s.seq AND x.shot_type != 'PUTT')
         FROM shots s JOIN rounds r USING(round_id) WHERE r.category != 'short_course' ORDER BY s.round_id, s.seq, s.shot_no""").fetchall()
-    full = [r for r in rows if roles.get(r[3]) == "full" and r[4] not in ("CHIP", "RECOVERY", "PUTT") and r[6] is not None and r[7] is not None]
+    full = [r for r in rows if roles.get(r[3]) == "full" and r[4] not in ("CHIP", "RECOVERY", "PUTT") and r[5] is not None and r[6] is not None and r[7] is not None]
     by = {}
     for r in full: by.setdefault(r[3], []).append(r[5])
     mode = {c: kde_mode(a) for c, a in by.items() if len(a) >= MIN_N}
@@ -372,7 +372,7 @@ def full_swing_shots(con):
     """全揮桿球桿的擊球（排除切球、救球、推桿），附上是否打壞。"""
     roles = club_roles()
     rows = con.execute("""SELECT r.round_id, r.date, r.course, s.club, s.distance_yd FROM shots s JOIN rounds r USING(round_id)
-        WHERE s.shot_type NOT IN ('CHIP','RECOVERY','PUTT') ORDER BY r.date""").fetchall()
+        WHERE s.shot_type NOT IN ('CHIP','RECOVERY','PUTT') AND s.distance_yd IS NOT NULL ORDER BY r.date""").fetchall()
     rows = [r for r in rows if roles.get(r[3]) == "full"]
     by = {}
     for r in rows: by.setdefault(r[3], []).append(r[4])
@@ -521,6 +521,19 @@ def round_parts(fname):
     if len(groups) < 2 or not all(groups): return None, ""
     return per, "＋".join(groups)
 
+def bad_shot(shots, k, med, roles):
+    """明細表裡要圈起來的「打壞」：① 切球（A 杆、54 度）之後還有下一桿，例如連切兩次、A 接 54、A 接 P（切了沒上果嶺）；② 全揮桿的距離不到這支桿常態（中位數）的 70%，
+    而且也不到擊球前離旗桿距離的 70%（本來就只差一點就到的不算）。下水／OB 已經另外標，不重複圈。"""
+    c, d, sr, wc, hz, pin = shots[k]
+    if hz: return 0
+    chip = lambda x: roles.get(x) == "chip" or x == SAND_CLUB
+    if chip(c):
+        return 1 if k + 1 < len(shots) else 0                       # 切了之後還有下一桿（不是推桿）＝沒切上果嶺
+    m = med.get(c)
+    if not m or d is None or roles.get(c) not in ("full", "recovery") and c != DRIVER: return 0
+    room = pin * 1.09361 if pin else None
+    return 1 if d < MISHIT_RATIO * m and (room is None or d < MISHIT_RATIO * room) else 0
+
 def round_gps(fname):
     """讀一場的擊球座標；沒有就回傳 None。前九後九是兩張計分卡、兩個球場代碼，洞號會重複，所以每一洞都帶自己的球場代碼和這一場的第幾洞。"""
     rows = list(csv.DictReader(open(os.path.join(ROOT, "data/rounds", fname), encoding="utf-8-sig")))
@@ -571,7 +584,7 @@ def round_gps(fname):
                 if not sp or not ep: continue
                 club = x["club"]; cat = "d" if club == DRIVER else "c" if roles.get(club) == "chip" else "w" if (club in WOODS or "木" in club) else "i"
                 el = x["elie"] if x["src"] != "site" and not (k + 1 < len(ms) and ms[k + 1]["src"] == "site") else ("Green" if k + 1 == len(ms) else "")
-                new.append([club, cat, sp[0], sp[1], ep[0], ep[1], round(x["dist_m"] * 1.09361) if x["dist_m"] is not None else "", el or "", x["src"], x.get("haz") or ""])
+                new.append([club, cat, sp[0], sp[1], ep[0], ep[1], round(x["dist_m"] * 1.09361) if x["dist_m"] is not None else 0, el or "", x["src"], x.get("haz") or ""])
             cur["shots"] = new
     holes.sort(key=lambda h: h["n"]); drive.sort(key=lambda d: d["hole"])
     return {"holes": holes, "drive": drive} if holes else None
@@ -1003,12 +1016,15 @@ def section_roundlist(con):
     def club_table(rid):
         prev = order[:order.index(rid)] if rid in order else order
         return [[c, med([rid], c), med(prev[-RECENT_N:], c), med(prev, c)] for c in CLUBS if med([rid], c)]
+    roles = club_roles(); _dd = {}                                   # 每支桿的常態距離（中位數），明細表判斷打壞用
+    for c_, d_ in con.execute("SELECT s.club, s.distance_yd FROM shots s JOIN rounds r USING(round_id) WHERE r.category != 'short_course' AND s.distance_yd > 0 AND s.shot_type != 'PUTT'"): _dd.setdefault(c_, []).append(d_)
+    MED = {c_: sorted(v)[len(v) // 2] for c_, v in _dd.items() if len(v) >= 15}
     for rid, date, course, cat, n, strokes, over, diff, short, fname in con.execute("SELECT round_id, date, course, category, holes_played, strokes, over_par, differential, course_short, file FROM rounds ORDER BY date DESC"):
         holes = []
         for seq, hole, par, st, putts, src, yd, pen, on, unrec in con.execute("SELECT seq, hole, par, strokes, putts, putts_source, length_yd, penalties, strokes_to_green, unrecorded FROM holes WHERE round_id=? ORDER BY seq", (rid,)):
-            shots = con.execute("SELECT club, distance_yd, source, watch_club, hazard FROM shots WHERE round_id=? AND seq=? AND shot_type != 'PUTT' ORDER BY shot_no", (rid, seq)).fetchall()
+            shots = con.execute("SELECT club, distance_yd, source, watch_club, hazard, to_pin_start_m FROM shots WHERE round_id=? AND seq=? AND shot_type != 'PUTT' ORDER BY shot_no", (rid, seq)).fetchall()
             miss = unrec or 0
-            holes.append([hole, par, yd, [[c or "?", d, sr if sr == "site" else "", wc or "", hz or ""] for c, d, sr, wc, hz in shots], putts, src == "estimated", st, pen or 0, on, miss])
+            holes.append([hole, par, yd, [[c or "?", d, sr if sr == "site" else "", wc or "", hz or "", bad_shot(shots, k, MED, roles)] for k, (c, d, sr, wc, hz, _) in enumerate(shots)], putts, src == "estimated", st, pen or 0, on, miss])
         pv = [h[4] for h in holes if h[4] is not None]
         out.append({"date": date, "course": course, "short": short, "tag": tags.get(cat, ""), "cat": {"full_18": "full", "short_course": "short"}.get(cat, "partial"), "n": n, "strokes": strokes, "over": over, "hcp": diff,
                     "putts": sum(pv) if pv else None, "est": any(h[5] for h in holes), "holes": holes, "len": {seq: round(yd) for seq, yd in con.execute("SELECT seq, length_yd FROM holes WHERE round_id=? AND length_yd>0", (rid,))}, "clubs": club_table(rid), "gps": round_gps(fname), "parts": round_parts(fname)[0], "combo": round_parts(fname)[1]})
@@ -1188,7 +1204,7 @@ section h2{font-size:18px;font-weight:600;margin:0 0 4px}
 .tip div span:last-child{color:var(--ink)}
 select{font:inherit;font-size:14px;padding:6px 10px;border:1px solid var(--axis);border-radius:8px;background:var(--surface);color:var(--ink);margin-bottom:8px;max-width:100%}
 .rt{width:100%}.rt td,.rt th{text-align:center;padding:6px 8px}.rt td.shots{text-align:left}
-.chip{display:inline-block;border:1px solid var(--border);border-radius:6px;padding:1px 7px;margin:2px 4px 2px 0;font-size:12px;white-space:nowrap}.chip b{font-weight:500}.chip span{color:var(--ink2)}.chip.miss{border-style:dashed;color:var(--ink3,#999)}.chip.site{border-color:#3fae5a;border-width:1.5px}.chip i.hz{font-style:normal;font-weight:700;margin-left:4px;padding:0 4px;border-radius:4px;background:#2f7fd6;color:#fff;font-size:11px}.chip i.hz.ob{background:#d64545}.chip.miss b{font-weight:700}.chip.pen{border-color:#4a90d9}
+.chip{display:inline-block;border:1px solid var(--border);border-radius:6px;padding:1px 7px;margin:2px 4px 2px 0;font-size:12px;white-space:nowrap}.chip b{font-weight:500}.chip span{color:var(--ink2)}.chip.miss{border-style:dashed;color:var(--ink3,#999)}.chip.site{border-color:#3fae5a;border-width:1.5px}.chip.bad{box-shadow:0 0 0 2px #e5484d}.chip i.hz{font-style:normal;font-weight:700;margin-left:4px;padding:0 4px;border-radius:4px;background:#2f7fd6;color:#fff;font-size:11px}.chip i.hz.ob{background:#d64545}.chip.miss b{font-weight:700}.chip.pen{border-color:#4a90d9}
 .rt td.bad{color:#d03b3b;font-weight:600}.rt td.good{color:#0c8a0c;font-weight:600}.rt tr.tot td{font-weight:600;border-top:1px solid var(--axis)}.rt tr.nine td{border-bottom:2px solid var(--axis);background:color-mix(in srgb,var(--ink) 6%,transparent)}
 .rl{width:100%}.rl th,.rl td{text-align:center;padding:8px 8px}.rl td.course,.rl th:nth-child(2){text-align:left}.rl td.strong{font-weight:600}.rl td.zero{color:var(--up);font-weight:600}
 .rl tr.row{cursor:pointer}.rl tr.row:hover{background:var(--page)}.rl tr.more{display:none}.rl.all tr.more{display:table-row}.rl td.arrow{color:var(--muted);width:28px}
@@ -2057,14 +2073,14 @@ DRAW.roundlist = (sec, host) => {
     const AB = REPORT.abbr || {}, ab = c => AB[c] || String(c).replace(/^(\d)鐵$/, "$1i").replace(/^(\d\d)度$/, "$1°");
     r.holes.forEach(([hole, par, yd, shots, putts, est, st, pen, on, miss], i) => { const tr = h("tr", "", tb);
       h("td", "", tr, hole); h("td", "", tr, par); h("td", "", tr, yd || ""); const td = h("td", "shots", tr);
-      shots.forEach(([c, dd, sr, wc, hz]) => { const b = h("span", "chip" + (sr === "site" ? " site" : ""), td); h("b", "", b, ab(c)); if (hz) h("i", "hz" + (hz === "OB" ? " ob" : ""), b, hz); b.title = sr === "site" ? c + "（網站補的，手錶沒記到）" : wc ? c + "（手錶記成 " + wc + "）" : c; });
+      shots.forEach(([c, dd, sr, wc, hz, bad]) => { const b = h("span", "chip" + (sr === "site" ? " site" : "") + (bad ? " bad" : ""), td); h("b", "", b, ab(c)); if (hz) h("i", "hz" + (hz === "OB" ? " ob" : ""), b, hz); b.title = sr === "site" ? c + "（網站補的，手錶沒記到）" : wc ? c + "（手錶記成 " + wc + "）" : c; });
       if (pen && !shots.some(x => x[4])) { const b = h("span", "chip pen", td); h("b", "", b, "罰"); h("span", "", b, " " + pen); }
       for (let k = 0; k < (miss || 0); k++) { const b = h("span", "chip miss", td); h("b", "", b, "?"); b.title = "手錶沒記到"; }
       h("td", "", tr, on == null ? "" : on); h("td", "", tr, putts == null ? "" : putts); h("td", "", tr, st);
       const dv = st - par; h("td", dv >= 3 ? "bad" : dv <= 0 ? "good" : "", tr, dv > 0 ? "+" + dv : dv === 0 ? "E" : dv);
       if (r.holes.length > 9 && (i % 9 === 8 || i === r.holes.length - 1)) { const k = i - i % 9, part = r.holes.slice(k, i + 1), t2 = h("tr", "tot nine", tb), nm = h("td", "", t2, r.parts && r.parts[k] ? r.parts[k] : k === 0 ? "前九" : k === 9 ? "後九" : ""); nm.colSpan = 4; nm.style.textAlign = "left";
         h("td", "", t2, part.every(x => x[8] != null) ? part.reduce((a, x) => a + x[8], 0) : ""); h("td", "", t2, part.every(x => x[4] != null) ? part.reduce((a, x) => a + x[4], 0) : ""); h("td", "", t2, part.reduce((a, x) => a + x[6], 0)); h("td", "", t2, ""); } });
-    h("p", "note", box, "1W 一號木　H 鐵木　6i 六鐵　綠框＝手錶沒記到、網站補上的一桿　？＝兩邊都沒記到　ON＝幾桿上果嶺　每一桿的距離看揮桿圖");
+    h("p", "note", box, "紅框＝打壞（切了沒上果嶺、或距離不到常態七成）　綠框＝網站補上的一桿　？＝兩邊都沒記到　ON＝幾桿上果嶺　每一桿的距離看揮桿圖");
     return box; };
   const T = sec.targets || {}, full = r => r.cat === "full";
   const FLAT = 2, FULL = sec.data.filter(full), F5 = FULL.slice(0, 5), AVG5 = F5.length ? F5.reduce((a, r) => a + r.strokes, 0) / F5.length : null;
