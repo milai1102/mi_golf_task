@@ -28,7 +28,7 @@ async def main():
             await cadlib.hole(pg, 2); await pg.wait_for_timeout(500); print("hole2", await st())
             await cadlib.hole(pg, 1); await pg.wait_for_timeout(500); print("hole1", await st())
             await pg.click(".cad-card"); await pg.wait_for_timeout(200); print("round sheet", (await pg.inner_text(".cad-sheet")).replace("\n"," "))
-            await pg.locator(".cad-sheet .acts button").first.click(); await pg.wait_for_timeout(200); await pg.locator(".cad-sheet .shots button").first.click(); await pg.wait_for_timeout(200); await pg.click(".cad-sheet .del"); await pg.wait_for_timeout(300); print("del 1st", await st())
+            await pg.locator(".cad-sheet .fsc .c.cur").first.click(); await pg.wait_for_timeout(200); await pg.locator(".cad-sheet .shots button").first.click(); await pg.wait_for_timeout(200); await pg.click(".cad-sheet .del"); await pg.wait_for_timeout(300); print("del 1st", await st())
             await pg.screenshot(path=f"/home/claude/shot/f3_{scheme}_full.png", full_page=True)
             print("errs", errs); await ctx.close()
         await b.close()

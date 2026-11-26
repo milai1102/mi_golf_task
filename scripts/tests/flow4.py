@@ -23,7 +23,7 @@ async def main():
         await pg.click(".cad-sheet .nums >> nth=0 >> text='3'"); await pg.locator(".cad-sheet .nums").nth(1).get_by_text("2", exact=True).click(); await pg.locator(".cad-sheet .nums").nth(2).get_by_text("5", exact=True).click()
         await pg.wait_for_timeout(200); await pg.screenshot(path="/home/claude/shot/f4c.png"); await pg.click(".cad-sheet .ok"); await pg.wait_for_timeout(300); print("done", await row())
         # hole 5 without scoring? clear putts first to test reminder
-        await pg.click(".cad-finb"); await pg.locator(".cad-sheet .nums").nth(1).get_by_text("2", exact=True).click(); await pg.click(".cad-sheet .ok")
+        await pg.click(".cad-finb"); await pg.wait_for_timeout(200); await pg.click(".cad-sheet .owe button"); await pg.wait_for_timeout(200); await pg.locator(".cad-sheet .nums").nth(1).get_by_text("2", exact=True).click(); await pg.click(".cad-sheet .ok")
         await pg.evaluate("localStorage.setItem('__cad_skew', '400000')"); await geo(t5); print("tee5", await row()); await pg.screenshot(path="/home/claude/shot/f4d.png")
         await pg.click(".cad-msg .cad-undo"); await pg.wait_for_timeout(300); await pg.locator(".cad-sheet .nums").nth(1).get_by_text("3", exact=True).click(); await pg.click(".cad-sheet .ok"); await pg.wait_for_timeout(300)
         await pg.reload(); await pg.wait_for_timeout(1500)
