@@ -33,7 +33,7 @@ def jit(ll):
 async def run(day, holes, br):
     random.seed(hash(day) % 1000)
     ctx = await br.new_context(viewport={"width": 393, "height": 683}, permissions=["geolocation"], geolocation={"latitude": 25.03, "longitude": 121.56, "accuracy": 8})
-    pg = await ctx.new_page(); errs = []; pg.on("pageerror", lambda e: errs.append(str(e)))
+    pg = await ctx.new_page(); await pg.add_init_script("(()=>{const d=new Date(),p=v=>String(v).padStart(2,'0');if(!localStorage.getItem('mi-caddie-mode'))localStorage.setItem('mi-caddie-mode',JSON.stringify({day:d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()),m:'play',man:true}))})()"); errs = []; pg.on("pageerror", lambda e: errs.append(str(e)))
     await pg.goto("http://localhost:8765/reports/caddie.html"); await pg.wait_for_timeout(700)
     state = lambda: pg.evaluate("""(()=>{const q=s=>document.querySelector(s),sl=document.querySelectorAll('.cad-top select')[1];return {c:document.querySelectorAll('.cad-top select')[0].selectedOptions[0].textContent,l:sl&&sl.options.length>1?sl.selectedOptions[0].textContent:'',h:+q('.cad-holes .on').textContent,msg:q('.cad-msg').textContent,row:[q('.cad-add').textContent],sg:'',live:q('.cad-here').classList.contains('live')}})()""")
     issues = []; n_shots = 0; n_ok_hole = 0; sugsame = 0; subst = 0

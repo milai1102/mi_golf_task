@@ -4,7 +4,7 @@ import asyncio, json, sys
 from playwright.async_api import async_playwright
 async def one(br, label, **kw):
     ctx = await br.new_context(viewport={"width": 393, "height": 683}, **kw)
-    pg = await ctx.new_page(); errs = []; pg.on("pageerror", lambda e: errs.append(str(e)))
+    pg = await ctx.new_page(); await pg.add_init_script("(()=>{const d=new Date(),p=v=>String(v).padStart(2,'0');if(!localStorage.getItem('mi-caddie-mode'))localStorage.setItem('mi-caddie-mode',JSON.stringify({day:d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()),m:'play',man:true}))})()"); errs = []; pg.on("pageerror", lambda e: errs.append(str(e)))
     await pg.goto("http://localhost:8765/reports/caddie.html"); await pg.wait_for_timeout(900)
     await pg.evaluate("""(()=>{const s=document.querySelectorAll('.cad-top select')[0];s.value=[...s.options].find(o=>o.textContent.startsWith('南寶')).value;s.dispatchEvent(new Event('change'));})()""")
     await pg.wait_for_timeout(400); n = 0

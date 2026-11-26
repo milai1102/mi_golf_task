@@ -16,7 +16,7 @@ async def main():
         ctx = await b.new_context(viewport={"width":393,"height":683}, device_scale_factor=2, color_scheme="light", permissions=["geolocation"], geolocation={"latitude":pts[0][0],"longitude":pts[0][1],"accuracy":6})
         await ctx.add_init_script("localStorage.setItem('__cad_tap','1')")
         await ctx.add_init_script(DELAY)
-        pg = await ctx.new_page(); errs=[]; pg.on("pageerror", lambda e: errs.append(str(e)))
+        pg = await ctx.new_page(); await pg.add_init_script("(()=>{const d=new Date(),p=v=>String(v).padStart(2,'0');if(!localStorage.getItem('mi-caddie-mode'))localStorage.setItem('mi-caddie-mode',JSON.stringify({day:d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()),m:'play',man:true}))})()"); errs=[]; pg.on("pageerror", lambda e: errs.append(str(e)))
         st = lambda: pg.evaluate("""(()=>{const q=s=>document.querySelector(s);return [q('.cad-holes .on')&&q('.cad-holes .on').textContent, q('.cad-msg').textContent, [document.querySelector('.cad-add').textContent, document.querySelector('.cad-finb').textContent].join(' | '), q('.cad-here').className, (JSON.parse(localStorage.getItem('mi-caddie-shots')||'{}').holes)||{}]})()""")
         async def show(tag):
             s = await st(); print(f"[{tag}] hole={s[0]} msg={s[1]!r}\n     row={s[2]} btn={s[3]}\n     store={json.dumps(s[4],ensure_ascii=False)}")

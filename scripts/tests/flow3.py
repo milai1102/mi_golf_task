@@ -9,7 +9,7 @@ async def main():
             ctx = await b.new_context(viewport={"width":393,"height":683}, device_scale_factor=2, color_scheme=scheme)
             await ctx.add_init_script("localStorage.setItem('__cad_tap','1')")
             await ctx.add_init_script("if(!localStorage.getItem('mi-caddie')){}")
-            pg = await ctx.new_page(); errs=[]; pg.on("pageerror", lambda e: errs.append(str(e)))
+            pg = await ctx.new_page(); await pg.add_init_script("(()=>{const d=new Date(),p=v=>String(v).padStart(2,'0');if(!localStorage.getItem('mi-caddie-mode'))localStorage.setItem('mi-caddie-mode',JSON.stringify({day:d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()),m:'play',man:true}))})()"); errs=[]; pg.on("pageerror", lambda e: errs.append(str(e)))
             await pg.goto("http://localhost:8765/reports/caddie.html"); await pg.wait_for_timeout(600)
             await pg.evaluate("""(()=>{const s=document.querySelector('.cad-top select');const o=[...s.options].find(o=>o.textContent.startsWith('南寶'));s.value=o.value;s.dispatchEvent(new Event('change'));})()""")
             await pg.wait_for_timeout(500)

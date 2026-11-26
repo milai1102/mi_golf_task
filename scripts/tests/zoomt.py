@@ -2,7 +2,7 @@ import asyncio
 from playwright.async_api import async_playwright
 async def main():
     async with async_playwright() as p:
-        b=await p.chromium.launch(); pg=await b.new_page(viewport={"width":393,"height":760},device_scale_factor=2,color_scheme="dark")
+        b=await p.chromium.launch(); pg=await b.new_page(viewport={"width":393,"height":760},device_scale_factor=2,color_scheme="dark"); await pg.add_init_script("(()=>{const d=new Date(),p=v=>String(v).padStart(2,'0');if(!localStorage.getItem('mi-caddie-mode'))localStorage.setItem('mi-caddie-mode',JSON.stringify({day:d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()),m:'play',man:true}))})()")
         errs=[]; pg.on("pageerror",lambda e:errs.append(str(e)))
         await pg.goto("http://localhost:8765/reports/caddie.html"); await pg.wait_for_timeout(800)
         vb=lambda: pg.evaluate("document.querySelector('.cad-map > svg').getAttribute('viewBox')")

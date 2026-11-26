@@ -20,7 +20,7 @@ async def main():
                     ctx=await b.new_context(viewport={"width":w,"height":760},device_scale_factor=3,color_scheme=sch)
                     st=store(short,gr)
                     await ctx.add_init_script("localStorage.setItem('mi-caddie-shots',%s)"%json.dumps(json.dumps(st)))
-                    pg=await ctx.new_page(); errs=[]; pg.on("pageerror",lambda e:errs.append(str(e)))
+                    pg=await ctx.new_page(); await pg.add_init_script("(()=>{const d=new Date(),p=v=>String(v).padStart(2,'0');if(!localStorage.getItem('mi-caddie-mode'))localStorage.setItem('mi-caddie-mode',JSON.stringify({day:d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()),m:'play',man:true}))})()"); errs=[]; pg.on("pageerror",lambda e:errs.append(str(e)))
                     await pg.goto("http://localhost:8765/reports/caddie.html"); await pg.wait_for_timeout(1500)
                     # select course
                     await pg.click(".cad-course"); await pg.wait_for_timeout(200)

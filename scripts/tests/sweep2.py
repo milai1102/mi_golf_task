@@ -5,7 +5,7 @@ JS = """(() => { const m=document.querySelector('.cad-map'), s=m.querySelector('
  return [m.innerText+'|'+[...s.querySelectorAll('text')].map(x=>x.textContent).join('|'), out, ov(tl,br)||ov(tl,gp)||ov(br,gp), inside(tl)&&inside(br)&&inside(gp)]; })()"""
 async def main():
     async with async_playwright() as p:
-        b = await p.chromium.launch(); pg = await b.new_page(viewport={"width":393,"height":740}, device_scale_factor=1, color_scheme="dark")
+        b = await p.chromium.launch(); pg = await b.new_page(viewport={"width":393,"height":740}, device_scale_factor=1, color_scheme="dark"); await pg.add_init_script("(()=>{const d=new Date(),p=v=>String(v).padStart(2,'0');if(!localStorage.getItem('mi-caddie-mode'))localStorage.setItem('mi-caddie-mode',JSON.stringify({day:d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()),m:'play',man:true}))})()")
         errs=[]; pg.on("pageerror", lambda e: errs.append(str(e)))
         await pg.goto("http://localhost:8765/reports/caddie.html"); await pg.wait_for_timeout(500)
         names = await pg.evaluate("[...document.querySelectorAll('.cad-top select')[0].options].map(o=>o.textContent)")

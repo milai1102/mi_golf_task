@@ -8,7 +8,7 @@ async def main():
         b=await p.chromium.launch(); bad=0; tot=0
         for vh,rec in ((640,False),(640,True),(760,False)):
             ctx=await b.new_context(viewport={"width":360,"height":vh},color_scheme="dark")
-            pg=await ctx.new_page(); errs=[]; pg.on("pageerror",lambda e:errs.append(str(e)))
+            pg=await ctx.new_page(); await pg.add_init_script("(()=>{const d=new Date(),p=v=>String(v).padStart(2,'0');if(!localStorage.getItem('mi-caddie-mode'))localStorage.setItem('mi-caddie-mode',JSON.stringify({day:d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()),m:'play',man:true}))})()"); errs=[]; pg.on("pageerror",lambda e:errs.append(str(e)))
             await pg.goto("http://localhost:8765/reports/caddie.html"); await pg.wait_for_timeout(1200)
             info=await pg.evaluate("()=>{const d=REPORT.sections.find(s=>s.kind==='caddie').data;const i=d.findIndex(c=>c.short==='南寶');return d[i].layouts.map((L,j)=>L.holes.map(H=>({h:H.h,tee:H.tee,pin:H.pin})))}")
             for j,L in enumerate(info):
