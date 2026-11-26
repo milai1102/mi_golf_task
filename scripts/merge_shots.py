@@ -120,15 +120,21 @@ def merge_round(fname, rows=None):
             m["dist_m"] = round(dist_m(m["s"], m["e"])) if m["s"] and m["e"] else (int(float(m["row"]["distance_m"])) if m["row"] and m["row"]["distance_m"] else None)
             m["pin_s"] = round(dist_m(m["s"], pin)) if m["s"] and pin else None
             m["pin_e"] = round(dist_m(m["e"], pin)) if m["e"] and pin else None
-        for k, m in enumerate(merged):                       # 使用者確認過的球桿（data/shot_fixes.csv）
+        for k, m in enumerate(merged):                       # 這一桿的結果是不是下水／OB：看下一桿網站記的球位
+            nx = merged[k + 1] if k + 1 < len(merged) else None
+            m["haz"] = HAZ.get(nx["lie"]) if nx and nx["lie"] else None
+        for k, m in enumerate(merged):                       # 使用者確認過的球桿與下水／OB（data/shot_fixes.csv）
             fx = FIXES.get((fname, seq, k + 1))
-            if fx: m["club"] = fx; m["conflict"] = None; m["fixed"] = True
+            if not fx: continue
+            if fx.get("club"): m["club"] = fx["club"]; m["conflict"] = None
+            if fx.get("hazard"): m["haz"] = HAZ.get(fx["hazard"], fx["hazard"])
         hole = {"on": ch.get("on"), "putts": ch.get("putts"), "steps": ch.get("steps"), "cid": cid, "h": h, "pin": pin, "pin_px": g.get("pin_px")}
         out[seq] = {"shots": merged, "hole": hole}
     return out
 
 _fp = os.path.join(ROOT, "data/shot_fixes.csv")
-FIXES = {(r["file"], int(r["seq"]), int(r["shot"])): r["club"] for r in csv.DictReader(open(_fp, encoding="utf-8"))} if os.path.exists(_fp) else {}
+FIXES = {(r["file"], int(r["seq"]), int(r["shot"])): r for r in csv.DictReader(open(_fp, encoding="utf-8"))} if os.path.exists(_fp) else {}
+HAZ = {"W": "下水", "O1": "OB", "O2": "OB"}       # 網站記的「球現在在哪裡」：這一桿是從罰桿之後打的，代表上一桿下水或 OB
 
 SHORT = {r["name_zh"]: r.get("short") or r["name_zh"] for r in csv.DictReader(open(os.path.join(ROOT, "data/raw/course_names.csv"), encoding="utf-8"))}
 

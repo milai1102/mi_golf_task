@@ -48,7 +48,7 @@ CREATE TABLE holes(round_id INTEGER, seq INTEGER, hole INTEGER, layout TEXT, par
   shots_recorded INTEGER, strokes_to_green INTEGER, first_putt_steps INTEGER, PRIMARY KEY(round_id, seq));
 CREATE TABLE shots(round_id INTEGER, seq INTEGER, shot_no INTEGER, club TEXT, shot_type TEXT, start_lie TEXT, end_lie TEXT,
   distance_m INTEGER, distance_yd INTEGER, to_pin_start_m INTEGER, to_pin_end_m INTEGER,
-  source TEXT, watch_club TEXT);   -- source：garmin 只有手錶／site 只有網站（手錶漏記）／both 兩邊都有；watch_club：兩邊球桿不同時手錶記的球桿
+  source TEXT, watch_club TEXT, hazard TEXT);   -- source：garmin 只有手錶／site 只有網站（手錶漏記）／both 兩邊都有；watch_club：兩邊球桿不同時手錶記的球桿
 """)
 problems = []
 for rid, path in enumerate(sorted(glob.glob(os.path.join(ROUNDS, "*.csv"))), 1):
@@ -86,8 +86,8 @@ for rid, path in enumerate(sorted(glob.glob(os.path.join(ROUNDS, "*.csv"))), 1):
                 el = LIE.get(nxt["lie"], "Unknown") if nxt and nxt["lie"] else (nxt["row"]["start_lie"] if nxt and nxt["row"] else "Green" if not nxt else "Unknown")
                 stype = row["shot_type"] if row else ("TEE" if k == 0 else "CHIP" if ps is not None and ps <= 55 else "APPROACH")
             if x["conflict"]: problems.append(f"{fname} 第 {seq} 洞第 {k + 1} 桿：球桿兩邊不一致（網站 {x['club']}、手錶 {x['conflict']}），請使用者確認後寫進 data/shot_fixes.csv")
-            con.execute("INSERT INTO shots VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)", (rid, seq, k + 1, x["club"], stype, sl, el, d, round(d * YD) if d is not None else None,
-                ps, pe, x["src"], x["conflict"]))
+            con.execute("INSERT INTO shots VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (rid, seq, k + 1, x["club"], stype, sl, el, d, round(d * YD) if d is not None else None,
+                ps, pe, x["src"], x["conflict"], x.get("haz")))
     course = rows[0]["course"]; k = len(holes)
     cat = "short_course" if course in SHORT_COURSES else "full_18" if k == 18 else "nine" if k == 9 else "partial"
     rating, slope, approx = rating_of(fname, list(dict.fromkeys(r["garmin_scorecard_id"] for r in rows))) if cat == "full_18" else (None, None, 0)
