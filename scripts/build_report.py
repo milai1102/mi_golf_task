@@ -571,7 +571,7 @@ def round_gps(fname):
                 if not sp or not ep: continue
                 club = x["club"]; cat = "d" if club == DRIVER else "c" if roles.get(club) == "chip" else "w" if (club in WOODS or "木" in club) else "i"
                 el = x["elie"] if x["src"] != "site" and not (k + 1 < len(ms) and ms[k + 1]["src"] == "site") else ("Green" if k + 1 == len(ms) else "")
-                new.append([club, cat, sp[0], sp[1], ep[0], ep[1], round(x["dist_m"] * 1.09361) if x["dist_m"] is not None else 0, el or "", x["src"], x.get("haz") or ""])
+                new.append([club, cat, sp[0], sp[1], ep[0], ep[1], round(x["dist_m"] * 1.09361) if x["dist_m"] is not None else "", el or "", x["src"], x.get("haz") or ""])
             cur["shots"] = new
     holes.sort(key=lambda h: h["n"]); drive.sort(key=lambda d: d["hole"])
     return {"holes": holes, "drive": drive} if holes else None
@@ -2026,7 +2026,7 @@ DRAW.roundlist = (sec, host) => {
     const tl = h("div", "mtl", fig); h("span", "z", tl, zone); h("b", "", tl, len ? `${len} 碼` : `Par ${par}`); if (len) h("span", "", tl, `Par ${par}`);
     const AB = REPORT.abbr || {}, ab = c => AB[c] || String(c).replace(/^(\d)鐵$/, "$1i").replace(/^(\d\d)度$/, "$1°"), NUMS = "①②③④⑤⑥⑦⑧⑨⑩", br = h("div", "mbr", fig);
     if (st) { const dv = st - par, hd = h("div", "hd", br); h("b", "", hd, `${st} 桿（${dv > 0 ? "+" + dv : dv === 0 ? "Par" : "−" + (-dv)}）`); if (putts != null) h("span", "", hd, row[8] != null ? `${row[8]} ON ${putts} 推` : `${putts} 推`); }
-    H.shots.forEach((s, i) => { const rr = h("div", "r" + (s[8] === "site" ? " site" : ""), br); h("i", "", rr, NUMS[i] || i + 1); const cb = h("b", "", rr, ab(s[0])); cb.style.color = SHOTC[s[1]] === undefined ? "" : SHOTC[s[1]]; h("span", "", rr, String(s[6])); if (s[9]) h("em", "hz" + (s[9] === "OB" ? " ob" : ""), rr, s[9]); });
+    H.shots.forEach((s, i) => { const rr = h("div", "r" + (s[8] === "site" ? " site" : ""), br); h("i", "", rr, NUMS[i] || i + 1); const cb = h("b", "", rr, ab(s[0])); cb.style.color = SHOTC[s[1]] === undefined ? "" : SHOTC[s[1]]; h("span", "", rr, s[9] ? "" : String(s[6])); if (s[9]) h("em", "hz" + (s[9] === "OB" ? " ob" : ""), rr, s[9]); });
     if (row[7] && !H.shots.some(s => s[9])) { const rr = h("div", "r", br); h("i", "", rr, "罰"); h("b", "", rr, row[7] + " 桿"); }
     if (row[9]) { const rr = h("div", "r miss", br); h("i", "", rr, "?"); h("b", "", rr, `漏記 ${row[9]} 桿`); }
     return fig; };

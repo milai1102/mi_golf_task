@@ -128,6 +128,8 @@ def merge_round(fname, rows=None):
             if not fx: continue
             if fx.get("club"): m["club"] = fx["club"]; m["conflict"] = None
             if fx.get("hazard"): m["haz"] = HAZ.get(fx["hazard"], fx["hazard"])
+        for m in merged:                                     # 下水／OB 的那一桿：落點是罰桿後的位置，距離沒有意義
+            if m.get("haz"): m["dist_m"] = None
         hole = {"on": ch.get("on"), "putts": ch.get("putts"), "steps": ch.get("steps"), "cid": cid, "h": h, "pin": pin, "pin_px": g.get("pin_px")}
         out[seq] = {"shots": merged, "hole": hole}
     return out
