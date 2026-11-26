@@ -33,9 +33,16 @@ def best_fix(s):
 
 def main(path):
     L = json.load(open(path, encoding="utf-8"))
-    day = L.get("day") or {}
+    days = [L.get("day") or {}] + list((L.get("days") or {}).values())   # 當天＋之前幾天保留下來的
+    days = [d for d in days if d.get("day") and d.get("holes")]
+    if not days: sys.exit("這份紀錄裡沒有任何一天的成績")
+    seen = set()
+    for d in days:
+        if d["day"] in seen: continue
+        seen.add(d["day"]); one(L, d)
+
+def one(L, day):
     date = day.get("day"); holes = day.get("holes", {}); cids = L.get("cids") or {}
-    if not date or not holes: sys.exit("這份紀錄裡沒有當天的成績（day）")
     C = caddie_courses(); out = {}
     for key, v in holes.items():
         short, li, h = key.split("|")
