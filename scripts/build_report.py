@@ -525,7 +525,7 @@ def bad_shot(shots, k, med, roles):
     """明細表裡要圈起來的「打壞」：① 切球（A 杆、54 度）之後還有下一桿，例如連切兩次、A 接 54、A 接 P（切了沒上果嶺）；② 全揮桿的距離不到這支桿常態（中位數）的 70%，
     而且也不到擊球前離旗桿距離的 70%（本來就只差一點就到的不算）。下水／OB 已經另外標，不重複圈。"""
     c, d, sr, wc, hz, pin = shots[k]
-    if hz: return 0
+    if hz: return 1                                                 # 下水／OB 本身就是失誤
     chip = lambda x: roles.get(x) == "chip" or x == SAND_CLUB
     if chip(c):
         return 1 if k + 1 < len(shots) else 0                       # 切了之後還有下一桿（不是推桿）＝沒切上果嶺
@@ -1204,7 +1204,7 @@ section h2{font-size:18px;font-weight:600;margin:0 0 4px}
 .tip div span:last-child{color:var(--ink)}
 select{font:inherit;font-size:14px;padding:6px 10px;border:1px solid var(--axis);border-radius:8px;background:var(--surface);color:var(--ink);margin-bottom:8px;max-width:100%}
 .rt{width:100%}.rt td,.rt th{text-align:center;padding:6px 8px}.rt td.shots{text-align:left}
-.chip{display:inline-block;border:1px solid var(--border);border-radius:6px;padding:1px 7px;margin:2px 4px 2px 0;font-size:12px;white-space:nowrap}.chip b{font-weight:500}.chip span{color:var(--ink2)}.chip.miss{border-style:dashed;color:var(--ink3,#999)}.chip.site{border-color:#3fae5a;border-width:1.5px}.chip.bad{box-shadow:0 0 0 2px #e5484d}.chip i.hz{font-style:normal;font-weight:700;margin-left:4px;padding:0 4px;border-radius:4px;background:#2f7fd6;color:#fff;font-size:11px}.chip i.hz.ob{background:#d64545}.chip.miss b{font-weight:700}.chip.pen{border-color:#4a90d9}
+.chip{display:inline-block;border:1px solid var(--border);border-radius:6px;padding:1px 7px;margin:2px 4px 2px 0;font-size:12px;white-space:nowrap}.chip b{font-weight:500}.chip span{color:var(--ink2)}.chip.miss{border-style:dashed;color:var(--ink3,#999)}.chip.site{border-color:#3fae5a;border-width:1.5px}.chip.bad{box-shadow:0 0 0 2px #e5484d}b.mist{color:#e5484d;font-weight:800}.chip i.hz{font-style:normal;font-weight:700;margin-left:4px;padding:0 4px;border-radius:4px;background:#2f7fd6;color:#fff;font-size:11px}.chip i.hz.ob{background:#d64545}.chip.miss b{font-weight:700}.chip.pen{border-color:#4a90d9}
 .rt td.bad{color:#d03b3b;font-weight:600}.rt td.good{color:#0c8a0c;font-weight:600}.rt tr.tot td{font-weight:600;border-top:1px solid var(--axis)}.rt tr.nine td{border-bottom:2px solid var(--axis);background:color-mix(in srgb,var(--ink) 6%,transparent)}
 .rl{width:100%}.rl th,.rl td{text-align:center;padding:8px 8px}.rl td.course,.rl th:nth-child(2){text-align:left}.rl td.strong{font-weight:600}.rl td.zero{color:var(--up);font-weight:600}
 .rl tr.row{cursor:pointer}.rl tr.row:hover{background:var(--page)}.rl tr.more{display:none}.rl.all tr.more{display:table-row}.rl td.arrow{color:var(--muted);width:28px}
@@ -2042,7 +2042,7 @@ DRAW.roundlist = (sec, host) => {
     const tl = h("div", "mtl", fig); h("span", "z", tl, zone); h("b", "", tl, len ? `${len} 碼` : `Par ${par}`); if (len) h("span", "", tl, `Par ${par}`);
     const AB = REPORT.abbr || {}, ab = c => AB[c] || String(c).replace(/^(\d)鐵$/, "$1i").replace(/^(\d\d)度$/, "$1°"), NUMS = "①②③④⑤⑥⑦⑧⑨⑩", br = h("div", "mbr", fig);
     if (st) { const dv = st - par, hd = h("div", "hd", br); h("b", "", hd, `${st} 桿（${dv > 0 ? "+" + dv : dv === 0 ? "Par" : "−" + (-dv)}）`); if (putts != null) h("span", "", hd, row[8] != null ? `${row[8]} ON ${putts} 推` : `${putts} 推`); }
-    H.shots.forEach((s, i) => { const rr = h("div", "r" + (s[8] === "site" ? " site" : ""), br); h("i", "", rr, NUMS[i] || i + 1); const cb = h("b", "", rr, ab(s[0])); cb.style.color = SHOTC[s[1]] === undefined ? "" : SHOTC[s[1]]; h("span", "", rr, s[9] ? "" : String(s[6])); if (s[9]) h("em", "hz" + (s[9] === "OB" ? " ob" : ""), rr, s[9]); });
+    H.shots.forEach((s, i) => { const rr = h("div", "r", br); h("i", "", rr, NUMS[i] || i + 1); const cb = h("b", "", rr, ab(s[0])); cb.style.color = SHOTC[s[1]] === undefined ? "" : SHOTC[s[1]]; h("span", "", rr, s[9] ? "" : String(s[6])); if (s[9]) h("em", "hz" + (s[9] === "OB" ? " ob" : ""), rr, s[9]); });
     if (row[7] && !H.shots.some(s => s[9])) { const rr = h("div", "r", br); h("i", "", rr, "罰"); h("b", "", rr, row[7] + " 桿"); }
     if (row[9]) { const rr = h("div", "r miss", br); h("i", "", rr, "?"); h("b", "", rr, `漏記 ${row[9]} 桿`); }
     return fig; };
@@ -2073,14 +2073,14 @@ DRAW.roundlist = (sec, host) => {
     const AB = REPORT.abbr || {}, ab = c => AB[c] || String(c).replace(/^(\d)鐵$/, "$1i").replace(/^(\d\d)度$/, "$1°");
     r.holes.forEach(([hole, par, yd, shots, putts, est, st, pen, on, miss], i) => { const tr = h("tr", "", tb);
       h("td", "", tr, hole); h("td", "", tr, par); h("td", "", tr, yd || ""); const td = h("td", "shots", tr);
-      shots.forEach(([c, dd, sr, wc, hz, bad]) => { const b = h("span", "chip" + (sr === "site" ? " site" : "") + (bad ? " bad" : ""), td); h("b", "", b, ab(c)); if (hz) h("i", "hz" + (hz === "OB" ? " ob" : ""), b, hz); b.title = sr === "site" ? c + "（網站補的，手錶沒記到）" : wc ? c + "（手錶記成 " + wc + "）" : c; });
+      shots.forEach(([c, dd, sr, wc, hz, bad]) => { const b = h("span", "chip" + (bad ? " bad" : ""), td); h("b", "", b, ab(c)); if (hz) h("i", "hz" + (hz === "OB" ? " ob" : ""), b, hz); b.title = c; });
       if (pen && !shots.some(x => x[4])) { const b = h("span", "chip pen", td); h("b", "", b, "罰"); h("span", "", b, " " + pen); }
       for (let k = 0; k < (miss || 0); k++) { const b = h("span", "chip miss", td); h("b", "", b, "?"); b.title = "手錶沒記到"; }
       h("td", "", tr, on == null ? "" : on); h("td", "", tr, putts == null ? "" : putts); h("td", "", tr, st);
       const dv = st - par; h("td", dv >= 3 ? "bad" : dv <= 0 ? "good" : "", tr, dv > 0 ? "+" + dv : dv === 0 ? "E" : dv);
-      if (r.holes.length > 9 && (i % 9 === 8 || i === r.holes.length - 1)) { const k = i - i % 9, part = r.holes.slice(k, i + 1), t2 = h("tr", "tot nine", tb), nm = h("td", "", t2, r.parts && r.parts[k] ? r.parts[k] : k === 0 ? "前九" : k === 9 ? "後九" : ""); nm.colSpan = 4; nm.style.textAlign = "left";
+      if (r.holes.length > 9 && (i % 9 === 8 || i === r.holes.length - 1)) { const k = i - i % 9, part = r.holes.slice(k, i + 1), t2 = h("tr", "tot nine", tb), nm = h("td", "", t2, r.parts && r.parts[k] ? r.parts[k] : k === 0 ? "前九" : k === 9 ? "後九" : ""); nm.colSpan = 3; nm.style.textAlign = "left"; { const nb = part.reduce((a, x) => a + x[3].filter(y => y[5]).length, 0), mc = h("td", "shots", t2); if (nb) h("b", "mist", mc, `失誤 ${nb}`); }
         h("td", "", t2, part.every(x => x[8] != null) ? part.reduce((a, x) => a + x[8], 0) : ""); h("td", "", t2, part.every(x => x[4] != null) ? part.reduce((a, x) => a + x[4], 0) : ""); h("td", "", t2, part.reduce((a, x) => a + x[6], 0)); h("td", "", t2, ""); } });
-    h("p", "note", box, "紅框＝打壞（切了沒上果嶺、或距離不到常態七成）　綠框＝網站補上的一桿　？＝兩邊都沒記到　ON＝幾桿上果嶺　每一桿的距離看揮桿圖");
+    h("p", "note", box, "紅框＝失誤（下水、OB、切了沒上果嶺、距離不到常態七成）　？＝沒記到的一桿　ON＝幾桿上果嶺　每一桿的距離看揮桿圖");
     return box; };
   const T = sec.targets || {}, full = r => r.cat === "full";
   const FLAT = 2, FULL = sec.data.filter(full), F5 = FULL.slice(0, 5), AVG5 = F5.length ? F5.reduce((a, r) => a + r.strokes, 0) / F5.length : null;
