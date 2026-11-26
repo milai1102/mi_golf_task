@@ -23,7 +23,7 @@ async def main():
             await pg.click(".cad-card"); await pg.wait_for_timeout(300)
             bb=await pg.locator('.cad-sheet .box').bounding_box(); print(' round box top',bb['y'],'h',bb['height'],'vh',700)
             await pg.screenshot(path=f"nx_{sch}_3.png"); await pg.click('.cad-sheet .x'); await pg.wait_for_timeout(200)
-            await pg.click(".cad-add"); await pg.wait_for_timeout(800)
+            await pg.click(".cad-step.nx"); await pg.wait_for_timeout(800)
             print(' after next:', await pg.inner_text('.cad-hole'), '|', await pg.inner_text('.cad-add'), errs); await ctx.close()
         await b.close()
 asyncio.run(main())
