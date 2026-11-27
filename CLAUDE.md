@@ -990,3 +990,11 @@ python3 scripts/build_report.py      # golf.db → reports/index.html（整頁�
 - 檢查圖：`build_aerial_course.py ... --preview 資料夾` 會輸出每洞的分類疊圖；`/home/claude/shot/ym.py [photo]` 截桿弟頁 18 洞。
 - 公開找不到球洞配置的參考資料：shotnavi（有每洞配置圖，但擋爬蟲）、golfpass（只有計分卡）。`ref.yml` 可以在 Actions 抓網頁並把檔案以 base64 印在紀錄裡（artifact 的下載網域被擋），結果不進版控。
 - **電腦版（900px 以上）桿弟頁**（使用者 2026-11-27：左邊放圖、右邊放選項）：左邊是放大的球洞圖（頁面最寬 1500px，圖高到視窗底），右邊 380px 一欄，由上到下：球場／洞號、「這一洞怎麼打」（原本圖右下角的打法清單搬過來、字放大）、底部是「今天的成績」計分卡與記錄成績、最下面大顆「新增一桿」。手機版不變。檢查 `scripts/tests/pc.py`（1280、1440，深淺色）。
+
+## 第一（2026-11-27）：Arnold、Palmer 兩區也改用空拍自己描
+
+- 福爾摩莎第一（Garmin：Formosa First Country Club），代碼 032568＝Arnold（藍天）、032569＝Palmer（黃金）。旗桿來自使用者 11/27 開的模擬場次（393118766、393118793），存在 `data/course_pins/garmin_sim_pins.json`。原本 Garmin 圖資的預覽版（11/17）被取代。
+- 空拍 `data/areas/diyi18/`。這裡的照片偏暗，原本「亮度＋紋理」的樹林判斷會把球道當成樹，所以 `course_build/*.json` 加 `"veg": "smooth"`：改用「平滑而且不太暗」判斷草地，其他是樹。
+- 發球台：在旗桿周圍、半徑＝白梯碼數的圓上，找「往旗桿方向一路都是草地」而且靠近上一洞果嶺的點（`/home/claude/dy/tee2.py`），再逐洞看空拍確認。Arnold 15 手動修過。不確定的洞：Palmer 4（算出 633 碼，計分卡 550）、Palmer 15（502 碼 vs 446）、Arnold 12（603 vs 584）。
+- **Palmer 只有 16 洞**：Garmin 給的第 17、18 洞旗桿和第 1、2 洞完全一樣（golfpass 的計分卡也一樣重複），應是資料錯誤，先不放。實際打過之後用 Garmin 的擊球座標補。
+- `preview_courses()` 會把同一個 `garmin_name` 的多個預覽檔併成一個球場的多個分區；打過的分區（有擊球座標）優先，沒打過的分區才用預覽。
