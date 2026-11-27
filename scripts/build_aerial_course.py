@@ -82,7 +82,7 @@ def fill(polylist, f):
     return m.astype(bool)
 
 
-def classify(img, H, k, f, osm):
+def classify(img, H, k, f, osm, veg=""):
     rgb = img.astype(np.float32); r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
     hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV).astype(np.float32); V, Sat = hsv[..., 2], hsv[..., 1]
     m1 = cv2.blur(V, (7, 7)); m2 = cv2.blur(V * V, (7, 7)); sd = np.sqrt(np.maximum(m2 - m1 * m1, 0))
@@ -95,9 +95,16 @@ def classify(img, H, k, f, osm):
         keep0[i] = a * k * k >= 12 and a >= 0.35 * w * h and max(w, h) * k <= 45
     sand = keep0[lab0] | fill(osm["bunker"], f)
     water = fill(osm["water"], f)
-    dark = cv2.blur(V, (9, 9)) < 92
-    rough_tex = cv2.blur(sd, (9, 9)) > 15
-    tree = (dark | (rough_tex & (cv2.blur(V, (9, 9)) < 125))) & ~sand & ~water
+    if veg == "smooth":                                                           # 第一這類照片偏暗：用「平滑＋不太暗」判斷草地，其餘是樹
+        g = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY).astype(np.float32)
+        a1 = cv2.blur(g, (15, 15)); a2 = cv2.blur(g * g, (15, 15)); sd2 = np.sqrt(np.maximum(a2 - a1 * a1, 0))
+        grass = (sd2 < 13) & (a1 > 68) & (rgb[..., 1] >= rgb[..., 2])
+        grass = cv2.morphologyEx(grass.astype(np.uint8), cv2.MORPH_OPEN, np.ones((7, 7), np.uint8)).astype(bool)
+        tree = ~grass & ~sand & ~water
+    else:
+        dark = cv2.blur(V, (9, 9)) < 92
+        rough_tex = cv2.blur(sd, (9, 9)) > 15
+        tree = (dark | (rough_tex & (cv2.blur(V, (9, 9)) < 125))) & ~sand & ~water
     tree = cv2.morphologyEx(tree.astype(np.uint8), cv2.MORPH_OPEN, np.ones((7, 7), np.uint8)).astype(bool)
     tree = cv2.morphologyEx(tree.astype(np.uint8), cv2.MORPH_CLOSE, np.ones((7, 7), np.uint8)).astype(bool)
     open_ = ~tree & ~water
@@ -107,8 +114,9 @@ def classify(img, H, k, f, osm):
     tx, ty = PX, PY + int(round(H["_len_px"]))
     keep = set()
     for t in np.linspace(0, 1, 25):
-        x, y = int(PX), int(PY + t * (ty - PY))
-        if 0 <= y < S and lab[y, x]: keep.add(lab[y, x])
+        for dx in (-12, 0, 12):
+            x, y = int(PX + dx), int(PY + t * (ty - PY))
+            if 0 <= y < S and lab[y, x]: keep.add(lab[y, x])
     course = np.isin(lab, list(keep)) if keep else (open_ | sand | water)
     course = cv2.morphologyEx(course.astype(np.uint8), cv2.MORPH_CLOSE, np.ones((15, 15), np.uint8)).astype(bool)
     # 果嶺：OSM 有的就用 OSM；否則從旗桿往外長「平滑、明亮」的區塊，最多 22 碼
@@ -153,7 +161,7 @@ def main():
         k, f, ll, _ = frame(H)
         tee = f(*H["tee"]); H["_len_px"] = tee[1] - PY
         img = sample(photo, meta, ll)
-        L = classify(img, H, k, f, osm)
+        L = classify(img, H, k, f, osm, B.get("veg", ""))
         geo[str(H["h"])] = {"outline": polys(L["outline"], 2000, 3), "fairway": polys(L["fairway"], 600, 2.5), "green": polys(L["green"], 60, 1.5),
                             "water": polys(L["water"], 150, 2), "sand": polys(L["sand"], 25, 1.5), "tree": polys(L["tree"], 260, 3.2)}
         pv.append({"h": H["h"], "par": H["par"], "yd": H["yd"], "pin": [H["pin"][0], H["pin"][1], PX, PY],

@@ -883,7 +883,10 @@ def preview_courses():
             holes.append({"h": H["h"], "par": H["par"], "plays": [], "yd": yd, "k": round(k, 4), "pin": [px, py], "tee": tee, "pll": [lat, lon]})
         if not holes: continue
         nm = names.get(pv["garmin_name"], {})
-        out.append({"short": nm.get("short") or pv["garmin_name"], "name": nm.get("name_zh") or pv["garmin_name"], "n": 0, "last": "", "preview": 1,
+        same = next((c for c in out if c["garmin"] == pv["garmin_name"]), None)          # 同一個球場的不同分區（第一 Arnold／Palmer）併成一個球場
+        if same:
+            same["layouts"].append({"cid": cid, "label": pv.get("label", ""), "holes": holes}); continue
+        out.append({"short": nm.get("short") or pv["garmin_name"], "name": nm.get("name_zh") or pv["garmin_name"], "n": 0, "last": "", "preview": 1, "garmin": pv["garmin_name"],
                     "layouts": [{"cid": cid, "label": pv.get("label", ""), "holes": holes}],
                     "ll": [round(sum(h["pll"][0] for h in holes) / len(holes), 5), round(sum(h["pll"][1] for h in holes) / len(holes), 5)], "region": ""})
     return out
@@ -927,7 +930,9 @@ def section_caddie(con):
         c["layouts"] = [L for L in c["layouts"] if L["holes"]]
     courses = [c for c in courses if c["layouts"]]
     have = {L["cid"] for c in courses for L in c["layouts"]}
-    courses += [c for c in preview_courses() if c["layouts"][0]["cid"] not in have]
+    for c in preview_courses():
+        c["layouts"] = [L for L in c["layouts"] if L["cid"] not in have]
+        if c["layouts"]: courses.append(c)
     for c in courses:
         for L in c["layouts"]:
             for H in L["holes"]:
