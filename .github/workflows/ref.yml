@@ -23,5 +23,6 @@ jobs:
               except Exception as e: print("fail", u, e)
           P
           ls -la
+          for f in *; do echo "@@FILE $f"; base64 -w 0 "$f"; echo; echo "@@END"; done
       - uses: actions/upload-artifact@v4
         with: {name: ref, path: out, retention-days: 3}
