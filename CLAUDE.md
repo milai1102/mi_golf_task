@@ -989,3 +989,4 @@ python3 scripts/build_report.py      # golf.db → reports/index.html（整頁�
   - 每洞的空拍底圖照原本流程（`photo_plan.py 楊梅` → Actions 下載 → `data/photos/032570_*.jpg`）。
 - 檢查圖：`build_aerial_course.py ... --preview 資料夾` 會輸出每洞的分類疊圖；`/home/claude/shot/ym.py [photo]` 截桿弟頁 18 洞。
 - 公開找不到球洞配置的參考資料：shotnavi（有每洞配置圖，但擋爬蟲）、golfpass（只有計分卡）。`ref.yml` 可以在 Actions 抓網頁並把檔案以 base64 印在紀錄裡（artifact 的下載網域被擋），結果不進版控。
+- **電腦版（900px 以上）桿弟頁**（使用者 2026-11-27：左邊放圖、右邊放選項）：左邊是放大的球洞圖（頁面最寬 1500px，圖高到視窗底），右邊 380px 一欄，由上到下：球場／洞號、「這一洞怎麼打」（原本圖右下角的打法清單搬過來、字放大）、底部是「今天的成績」計分卡與記錄成績、最下面大顆「新增一桿」。手機版不變。檢查 `scripts/tests/pc.py`（1280、1440，深淺色）。
