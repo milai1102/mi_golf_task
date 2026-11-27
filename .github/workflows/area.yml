@@ -1,0 +1,22 @@
+name: 下載球場範圍的空拍與 OSM
+on:
+  push:
+    paths: ["data/areas/plan.json", "scripts/fetch_area.py"]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install pillow
+      - run: python3 scripts/fetch_area.py
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898699+github-actions[bot]@users.noreply.github.com"
+          git pull -q --rebase || true
+          git add data/areas
+          git diff --cached --quiet || (git commit -m "下載球場範圍的空拍與 OSM" && git push)
