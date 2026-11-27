@@ -1,0 +1,27 @@
+name: 下載參考網頁（不進版控）
+on:
+  workflow_dispatch:
+    inputs:
+      url: {description: "網頁網址", required: true}
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          mkdir -p out && cd out
+          curl -sL -A "Mozilla/5.0" "${{ github.event.inputs.url }}" -o page.html
+          python3 - <<'P'
+          import re, urllib.parse, urllib.request
+          base = "${{ github.event.inputs.url }}"
+          html = open("page.html", encoding="utf-8", errors="ignore").read()
+          srcs = sorted(set(re.findall(r'(?:src|href)="([^"]+\.(?:png|jpg|jpeg|gif))"', html, re.I)))
+          for i, s in enumerate(srcs):
+              u = urllib.parse.urljoin(base, s)
+              try:
+                  d = urllib.request.urlopen(urllib.request.Request(u, headers={"User-Agent": "Mozilla/5.0"}), timeout=30).read()
+                  open("%03d_%s" % (i, u.split("/")[-1].split("?")[0]), "wb").write(d)
+              except Exception as e: print("fail", u, e)
+          P
+          ls -la
+      - uses: actions/upload-artifact@v4
+        with: {name: ref, path: out, retention-days: 3}
