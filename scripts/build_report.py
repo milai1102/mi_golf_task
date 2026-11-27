@@ -868,6 +868,9 @@ def preview_courses():
         if cid not in GEO: GEO[cid] = json.load(open(gp))["holes"] if os.path.exists(gp) else {}
         holes = []
         for H in pv["holes"]:
+            if pv.get("frame") == "aerial":                                      # 自己用空拍描的球場：圖框、比例尺、經緯度轉換都已經算好
+                holes.append({"h": H["h"], "par": H["par"], "plays": [], "yd": H["yd"], "k": H["k"], "pin": H["pin"][2:4], "tee": H["tee_px"],
+                              "pll": H["pin"][:2], "ll": H["ll"], "aerial": 1}); continue
             g = GEO[cid].get(str(H["h"]), {}); o = (g.get("outline") or [[]])[0]
             if not o: continue
             lat, lon, px, py = H["pin"]; y0 = min(q[1] for q in o); y1 = max(q[1] for q in o)
