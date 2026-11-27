@@ -716,13 +716,24 @@ def caddie_geofit():
     out = {}; K = 180 / 2 ** 31
     for key, v in pts.items():
         v = list(set(v))
-        if len(v) < 4: continue
+        if len(v) < 2: continue
         lat = np.array([p[0] * K for p in v]); lon = np.array([p[1] * K for p in v]); lat0, lon0 = float(lat.mean()), float(lon.mean())
-        A = np.column_stack([lon - lon0, lat - lat0, np.ones(len(v))])
-        cx, *_ = np.linalg.lstsq(A, np.array([p[2] for p in v], float), rcond=None); cy, *_ = np.linalg.lstsq(A, np.array([p[3] for p in v], float), rcond=None)
-        err = float(np.max(np.hypot(A @ cx - [p[2] for p in v], A @ cy - [p[3] for p in v])))
-        if err > 12: continue                                                      # 點太少或共線，轉換不可靠
-        out[key] = [round(lat0, 7), round(lon0, 7)] + [round(float(x), 3) for x in list(cx) + list(cy)]
+        X = np.array([p[2] for p in v], float); Y = np.array([p[3] for p in v], float)
+        if len(v) >= 4:
+            A = np.column_stack([lon - lon0, lat - lat0, np.ones(len(v))])
+            cx, *_ = np.linalg.lstsq(A, X, rcond=None); cy, *_ = np.linalg.lstsq(A, Y, rcond=None)
+            err = float(np.max(np.hypot(A @ cx - X, A @ cy - Y)))
+            if err <= 12:
+                out[key] = [round(lat0, 7), round(lon0, 7)] + [round(float(x), 3) for x in list(cx) + list(cy)]; continue
+        # 點太少或共線：改用相似轉換（只有旋轉、縮放、平移，地圖本來就是正射的），兩個點就夠
+        me, mn = 111320.0 * np.cos(np.radians(lat0)), 110540.0
+        w = me * (lon - lon0) + 1j * mn * (lat - lat0); z = X - 1j * Y
+        if np.ptp(np.abs(w - w.mean())) == 0 and np.abs(w - w.mean()).max() < 20: continue   # 點都擠在一起，算不出方向
+        M = np.column_stack([w, np.ones(len(v))]); (a, b), *_ = np.linalg.lstsq(M, z, rcond=None)
+        err = float(np.max(np.abs(M @ np.array([a, b]) - z)))
+        if err > 15 or not (0.5 < abs(a) < 5): continue
+        cx = [a.real * me, -a.imag * mn, b.real]; cy = [-a.imag * me, -a.real * mn, -b.imag]
+        out[key] = [round(lat0, 7), round(lon0, 7)] + [round(float(x), 3) for x in cx + cy]
     return out
 
 def caddie_path(tee, pin, k, fairways):
