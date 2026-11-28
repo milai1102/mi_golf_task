@@ -1,0 +1,45 @@
+import asyncio, datetime
+from playwright.async_api import async_playwright
+day=datetime.date.today().isoformat()
+async def main():
+    async with async_playwright() as p:
+        b=await p.chromium.launch()
+        for sch,W in [("dark",393),("light",360)]:
+            ctx=await b.new_context(viewport={"width":W,"height":760},device_scale_factor=2,color_scheme=sch)
+            pg=await ctx.new_page(); errs=[]; pg.on("pageerror",lambda e:errs.append(str(e)))
+            await pg.goto("http://localhost:8765/reports/caddie.html"); await pg.wait_for_timeout(1500)
+            ci=await pg.evaluate("""()=>{const d=REPORT.sections.find(s=>s.kind==='caddie').data;return d.findIndex(c=>c.short==='南寶')}""")
+            await pg.evaluate("""([day,ci])=>{localStorage.clear();localStorage.setItem('mi-caddie-mode',JSON.stringify({day,sim:false,man:true}));localStorage.setItem('mi-caddie',JSON.stringify([ci,0,'南寶',0,day]));localStorage.__cad_noask=1}""",[day,ci])
+            await pg.reload(); await pg.wait_for_timeout(1800)
+            o=f"/home/claude/shot/combo_{sch}{W}_"; T=lambda: pg.locator(".cad-top").inner_text()
+            print("0 top:",(await T()).replace("\n"," "))
+            await pg.screenshot(path=o+"0.png")
+            await pg.click(".cad-seg .q"); await pg.wait_for_timeout(400); await pg.screenshot(path=o+"1.png")
+            # choose 前九 C only, 開始
+            await pg.click('.combo .cbr >> nth=0 >> button:has-text("C")'); await pg.click(".combo .ok.go"); await pg.wait_for_timeout(500)
+            print("1 top:",(await T()).replace("\n"," "))
+            # go to hole 9
+            for i in range(8): await pg.click(".cad-nb.nx"); await pg.wait_for_timeout(150)
+            print("C9 next disabled:", await pg.locator(".cad-nb.nx").is_disabled(), (await pg.locator(".cad-nav").inner_text()).replace("\n"," "))
+            await pg.screenshot(path=o+"2.png")
+            await pg.click(".cad-course"); await pg.wait_for_timeout(400)
+            await pg.click('.combo .cbr >> nth=1 >> button:has-text("B")'); await pg.screenshot(path=o+"3.png"); await pg.click(".combo .ok.go"); await pg.wait_for_timeout(500)
+            print("2 top:",(await T()).replace("\n"," "), "hole:",(await pg.locator(".cad-hole").inner_text()).replace("\n",""))
+            await pg.click(".cad-nb.nx"); await pg.wait_for_timeout(400)
+            print("after next top:",(await T()).replace("\n"," "), "hole:",(await pg.locator(".cad-hole").inner_text()).replace("\n",""))
+            await pg.screenshot(path=o+"4.png")
+            await pg.click(".cad-nb.pv"); await pg.wait_for_timeout(400)
+            print("after prev:",(await T()).replace("\n"," "), (await pg.locator(".cad-hole").inner_text()).replace("\n",""))
+            await pg.click('.cad-seg button:has-text("B")'); await pg.wait_for_timeout(400)
+            print("seg B:",(await pg.locator(".cad-hole").inner_text()).replace("\n",""))
+            await pg.reload(); await pg.wait_for_timeout(1500)
+            print("reload top:",(await T()).replace("\n"," "))
+            # single course
+            await pg.click(".cad-course"); await pg.wait_for_timeout(300)
+            await pg.locator('.clist .cr:has-text("永漢") button').first.click(); await pg.wait_for_timeout(500)
+            print("永漢 top:",(await T()).replace("\n"," ")); await pg.screenshot(path=o+"5.png")
+            await pg.click(".cad-course"); await pg.wait_for_timeout(300)
+            await pg.locator('.clist .cr:has-text("第一") button').first.click(); await pg.wait_for_timeout(500)
+            print("第一 top:",(await T()).replace("\n"," "))
+            print("errs",errs); await ctx.close()
+asyncio.run(main())
