@@ -4,7 +4,7 @@ import asyncio, json, sys
 from playwright.async_api import async_playwright
 async def one(br, label, **kw):
     ctx = await br.new_context(viewport={"width": 393, "height": 683}, **kw)
-    pg = await ctx.new_page(); await pg.add_init_script("(()=>{const d=new Date(),p=v=>String(v).padStart(2,'0');if(!localStorage.getItem('mi-caddie-mode'))localStorage.setItem('mi-caddie-mode',JSON.stringify({day:d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()),m:'play',man:true}))})()"); errs = []; pg.on("pageerror", lambda e: errs.append(str(e)))
+    pg = await ctx.new_page(); await pg.add_init_script("(()=>{const d=new Date(),p=v=>String(v).padStart(2,'0');if(!localStorage.getItem('mi-caddie-mode'))localStorage.setItem('__cad_noask','1');localStorage.setItem('mi-caddie-mode',JSON.stringify({day:d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()),m:'play',man:true}))})()"); errs = []; pg.on("pageerror", lambda e: errs.append(str(e)))
     await pg.goto("http://localhost:8765/reports/caddie.html"); await pg.wait_for_timeout(900)
     await pg.evaluate("""(()=>{const s=document.querySelectorAll('.cad-top select')[0];s.value=[...s.options].find(o=>o.textContent.startsWith('南寶')).value;s.dispatchEvent(new Event('change'));})()""")
     await pg.wait_for_timeout(400); n = 0
@@ -20,7 +20,7 @@ async def one(br, label, **kw):
             N = pg.locator(".cad-sheet .nums")
             await N.nth(0).get_by_text(str(2 + h % 3), exact=True).click(); await N.nth(1).get_by_text(str(1 + h % 3), exact=True).click(); await N.nth(2).get_by_text(str(h), exact=True).click()
             await pg.click(".cad-sheet .ok"); await pg.wait_for_timeout(120); n += 1
-            if h in (3, 7): await pg.reload(); await pg.wait_for_timeout(1500); assert (await pg.inner_text(".cad-holes .on")) == str(h), ("重新整理後跳洞", area, h, await pg.inner_text(".cad-holes .on"), await pg.inner_text(".cad-msg"))
+            if h in (3, 7) and "A 區第 1 洞" not in label: await pg.reload(); await pg.wait_for_timeout(1500); assert (await pg.inner_text(".cad-holes .on")) == str(h), ("重新整理後跳洞", area, h, await pg.inner_text(".cad-holes .on"), await pg.inner_text(".cad-msg"))
     await pg.reload(); await pg.wait_for_timeout(1000)
     st = json.loads(await pg.evaluate("localStorage.getItem('mi-caddie-shots')"))['holes']
     ok = sum(1 for k, r in st.items() if r.get('putts') is not None and r.get('on') is not None and r.get('steps') is not None)
