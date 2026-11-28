@@ -58,7 +58,7 @@ def one(L, day):
                 la, lo = px_to_ll(Hx["ll"], *s["p"]); fx = (la, lo, None); src = "map"
             shots.append({k: val for k, val in {"club": s.get("c"), "t": s.get("t") or None, "lat": round(fx[0], 6) if fx else None, "lon": round(fx[1], 6) if fx else None,
                           "acc": fx[2] if fx else None, "pos": src if fx else None, "lie": s.get("l"), "pen": s.get("pen") or None,
-                          "ins": 1 if s.get("ins") else None, "auto": 1 if s.get("auto") else None}.items() if val is not None})
+                          "ins": 1 if s.get("ins") else None, "auto": 1 if s.get("auto") else None, "est": 1 if s.get("est") else None}.items() if val is not None})
         out[ck] = {k: val for k, val in {"on": v.get("on"), "putts": v.get("putts"), "steps": v.get("steps"), "st": v.get("st"), "shots": shots}.items() if val is not None}
     short = next(iter(holes)).split("|")[0]
     dst = os.path.join(ROOT, "data/raw/caddie", f"{date}_{short}.json")

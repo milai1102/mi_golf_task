@@ -99,7 +99,7 @@ def merge_round(fname, rows=None):
             gs = gmap.get(int(r["shot_no"]), {}); G.append({"row": r, "club": r["club"], "s": gs.get("s"), "e": gs.get("e"), "t": gs.get("t"), "sp": gs.get("sp"), "ep": gs.get("ep"), "elie": gs.get("elie")})
         ch = cad.get(f"{cid}_{h}", {}) if cid else {}
         S = [{"club": s.get("club"), "s": (s["lat"], s["lon"]) if s.get("lat") is not None else None, "t": s["t"] / 1000, "lie": s.get("lie"), "pen": s.get("pen") or 0,
-              "ins": s.get("ins"), "auto": s.get("auto")} for s in ch.get("shots", [])]
+              "ins": s.get("ins"), "auto": s.get("auto"), "est": s.get("est")} for s in ch.get("shots", [])]
         pairs = _pair(G, S); pi = dict(pairs); pj = {j: i for i, j in pairs}
         merged = []
         i = j = 0
@@ -109,11 +109,11 @@ def merge_round(fname, rows=None):
                 merged.append({"club": b["club"] or a["club"], "src": "both", "conflict": a["club"] if b["club"] and b["club"] != a["club"] else None,
                                "row": a["row"], "s": a["s"] or b["s"], "e": a["e"], "lie": b["lie"], "pen": b["pen"], "t": a["t"] or b["t"], "sp": a["sp"], "ep": a["ep"], "elie": a["elie"]}); i += 1; j += 1
             elif j < len(S) and j not in pj and (i >= len(G) or (i in pi and pi[i] > j) or (S[j]["t"] and G[i]["t"] and S[j]["t"] < G[i]["t"] - DT_BEFORE)):
-                b = S[j]; merged.append({"club": b["club"], "src": "site", "conflict": None, "row": None, "s": b["s"], "e": None, "lie": b["lie"], "pen": b["pen"], "t": b["t"], "sp": None, "ep": None, "elie": None}); j += 1
+                b = S[j]; merged.append({"club": b["club"], "src": "site", "conflict": None, "row": None, "s": b["s"], "e": None, "lie": b["lie"], "pen": b["pen"], "t": b["t"], "sp": None, "ep": None, "elie": None, "est": b.get("est")}); j += 1
             elif i < len(G) and i not in pi:
                 a = G[i]; merged.append({"club": a["club"], "src": "garmin", "conflict": None, "row": a["row"], "s": a["s"], "e": a["e"], "lie": None, "pen": 0, "t": a["t"], "sp": a["sp"], "ep": a["ep"], "elie": a["elie"]}); i += 1
             else:                                            # 剩下的網站擊球
-                b = S[j]; merged.append({"club": b["club"], "src": "site", "conflict": None, "row": None, "s": b["s"], "e": None, "lie": b["lie"], "pen": b["pen"], "t": b["t"], "sp": None, "ep": None, "elie": None}); j += 1
+                b = S[j]; merged.append({"club": b["club"], "src": "site", "conflict": None, "row": None, "s": b["s"], "e": None, "lie": b["lie"], "pen": b["pen"], "t": b["t"], "sp": None, "ep": None, "elie": None, "est": b.get("est")}); j += 1
         pin = g["pin"]
         for k, m in enumerate(merged):
             nxt = merged[k + 1]["s"] if k + 1 < len(merged) else None
@@ -133,6 +133,10 @@ def merge_round(fname, rows=None):
             if fx.get("hazard"): m["haz"] = HAZ.get(fx["hazard"], fx["hazard"])
         for m in merged:                                     # 下水／OB 的那一桿：落點是罰桿後的位置，距離沒有意義
             if m.get("haz"): m["dist_m"] = None
+        for k, m in enumerate(merged):                       # 位置是推算的（桿弟頁「補漏記」估出來、使用者沒有移動過）：這一桿和前一桿的距離都不可信
+            if m.get("est") and m["src"] == "site":
+                m["dist_m"] = None
+                if k: merged[k - 1]["dist_m"] = None
         hole = {"on": ch.get("on"), "putts": ch.get("putts"), "steps": ch.get("steps"), "cid": cid, "h": h, "pin": pin, "pin_px": g.get("pin_px")}
         out[seq] = {"shots": merged, "hole": hole}
     return out
