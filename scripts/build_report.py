@@ -586,6 +586,31 @@ def round_gps(fname):
                 el = x["elie"] if x["src"] != "site" and not (k + 1 < len(ms) and ms[k + 1]["src"] == "site") else ("Green" if k + 1 == len(ms) else "")
                 new.append([club, cat, sp[0], sp[1], ep[0], ep[1], round(x["dist_m"] * 1.09361) if x["dist_m"] is not None else 0, el or "", x["src"], x.get("haz") or ""])
             cur["shots"] = new
+    if not holes and rows and rows[0].get("site_key") and (rows[0]["date"], merge_shots.SHORT.get(rows[0]["course"], rows[0]["course"])) in merge_shots.caddie_files():
+        M = merge_shots.merge_round(fname, rows); fit = _geofit()               # 只有網站紀錄：用網站每一桿的 GPS 畫揮桿圖與開球
+        par_of = {int(r["seq"]): int(r["par"]) for r in rows if r.get("par")}
+        for seq in sorted(M):
+            hd = M[seq]["hole"]; cid, hn = hd.get("cid"), hd.get("h")
+            if not cid or hn is None: continue
+            ll = fit.get((cid, hn))
+            if not ll: continue
+            if cid not in GEO:
+                gp = os.path.join(ROOT, "data/course_geo", f"{cid}.json")
+                GEO[cid] = json.load(open(gp))["holes"] if os.path.exists(gp) else {}
+            def px(q, ll=ll):
+                if not q: return None
+                return (round(ll[2] * (q[1] - ll[1]) + ll[3] * (q[0] - ll[0]) + ll[4]), round(ll[5] * (q[1] - ll[1]) + ll[6] * (q[0] - ll[0]) + ll[7]))
+            pinp = px(hd.get("pin")); cur = {"n": seq, "h": hn, "cid": cid, "par": par_of.get(seq), "pin": list(pinp) if pinp else None, "shots": []}; holes.append(cur)
+            ms = M[seq]["shots"]; pts = [x.get("sp") or px(x.get("s")) for x in ms]
+            for k, x in enumerate(ms):
+                sp = pts[k]; ep = pts[k + 1] if k + 1 < len(ms) else pinp
+                if not sp or not ep: continue
+                club = x["club"]; cat = "d" if club == DRIVER else "c" if roles.get(club) == "chip" else "w" if (club in WOODS or "木" in club) else "i"
+                yd = round(x["dist_m"] * 1.09361) if x.get("dist_m") is not None else 0
+                cur["shots"].append([club, cat, sp[0], sp[1], ep[0], ep[1], yd, "Green" if k + 1 == len(ms) else "", "site", x.get("haz") or ""])
+                if cat == "d" and k == 0 and x.get("dist_m") and not x.get("haz"):
+                    fo = fairway_offset(sp, ep, x["dist_m"], GEO.get(cid, {}).get(str(hn), {}).get("fairway", []))
+                    drive.append({"hole": seq, "yd": yd, "width": fo[0] if fo else None, "off": fo[1] if fo else None, "fw": ms[1].get("lie") == "F" if len(ms) > 1 and ms[1].get("lie") else bool(fo and fo[0] and abs(fo[1]) <= fo[0] / 2)})
     holes.sort(key=lambda h: h["n"]); drive.sort(key=lambda d: d["hole"])
     return {"holes": holes, "drive": drive} if holes else None
 
