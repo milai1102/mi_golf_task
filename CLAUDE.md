@@ -1011,3 +1011,15 @@ python3 scripts/build_report.py      # golf.db → reports/index.html（整頁�
 - 做法（`DRAW.caddie` 的 `terrain()` 與 `drawCore()` 裡 E 之後那一段）：每洞的輪廓先畫到 0.2 倍的隱藏 canvas，變成地形格子（外面、長草、樹、球道、水、沙坑、果嶺，依 `drawCourse` 的順序疊）。每個落點圈取 64 個樣本點（內圈 30%、外圈到 90% 各占對應的機率），代價 `TCOST`：球道與果嶺 0、長草 0.35、沙坑 0.5、樹 1.0、圖外 1.5、水 2.2；圈在瞄準線的垂直方向左右各試 30 碼（每 3 碼），再加每碼 0.006 的移動代價，取代價最低的位置。切桿、沙坑桿不調整。
 - 移好之後外圈仍有 5% 以上落在水裡，圈旁邊寫淺藍色「下水 N%」（左邊放不下就寫右邊）。
 - 還沒做：前後方向的調整（打短一點、換一支短的桿）；避不開水時改變拼或保守的判斷。南寶 A3 這種跨水的三桿洞，保守打法的圈仍有 15% 在水裡。
+
+## 用 PR 的工作流程（2026-11-28 起，使用者要練習 git）
+
+- **不再直接推到 main**。使用者照常回報問題，由 Claude 判斷怎麼分：一個問題一個 PR；同一則訊息裡相關的問題放同一個 PR，不相干的分開。分支名用英文短詞（例 `caddie-ring-fix`）。
+- 前一個 PR 還沒 merge 又有新問題：不相干的從 main 另開分支；改到同一段程式的接在原來的 PR 上繼續改，避免衝突。
+- **合併由使用者決定**：Claude 做完一個 PR 就在對話裡回報（PR 連結、改了什麼、截圖），使用者說「merge」才合併。合併用 squash（main 上一件事一個 commit），合併後刪掉分支。
+- **Claude 主動提醒 merge**：累積 3 個以上沒合併的 PR、某個 PR 放超過一天、或使用者要上場之前（網站只有 merge 之後才會更新），就列出等待中的 PR 問要不要 merge。每次開始新的工作前也先看一次 `gh pr list`。
+- **急修**：使用者說「直接上」（多半是上場當天或前一天），才直接推到 main。
+- **記下來**：使用者說「記下來」或「之後再修」，就開一個 GitHub issue；之後修的 PR 說明寫「Fixes #N」，merge 時自動關掉。
+- GitHub Actions 的機器人（空拍照片下載）照舊直接推到 main。main 目前沒有開分支保護，要開的話要讓機器人例外。
+- PR 是用使用者的帳號開的，GitHub 不讓作者自己按 Approve；在對話裡說 merge 就等於審核過。
+- 工具注意：這個環境的 `gh pr create`／`gh pr merge` 走 GraphQL 會被擋（403），改用 REST：開 PR `gh api repos/milai1102/mi_golf_task/pulls -f title=… -f head=分支 -f base=main -f body=…`；合併 `gh api -X PUT repos/milai1102/mi_golf_task/pulls/N/merge -f merge_method=squash`；刪分支 `git push origin --delete 分支`；列出 `gh api repos/milai1102/mi_golf_task/pulls --jq '.[]|[.number,.title]'`。
