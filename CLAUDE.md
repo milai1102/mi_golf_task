@@ -1023,3 +1023,13 @@ python3 scripts/build_report.py      # golf.db → reports/index.html（整頁�
 - GitHub Actions 的機器人（空拍照片下載）照舊直接推到 main。main 目前沒有開分支保護，要開的話要讓機器人例外。
 - PR 是用使用者的帳號開的，GitHub 不讓作者自己按 Approve；在對話裡說 merge 就等於審核過。
 - 工具注意：這個環境的 `gh pr create`／`gh pr merge` 走 GraphQL 會被擋（403），改用 REST：開 PR `gh api repos/milai1102/mi_golf_task/pulls -f title=… -f head=分支 -f base=main -f body=…`；合併 `gh api -X PUT repos/milai1102/mi_golf_task/pulls/N/merge -f merge_method=squash`；刪分支 `git push origin --delete 分支`；列出 `gh api repos/milai1102/mi_golf_task/pulls --jq '.[]|[.number,.title]'`。
+
+## 只有網站紀錄的場次也要進總表（2026-11-28）
+
+- 使用者的規則：**手錶和網站兩個來源，只要其中一個有，就要有這一場的紀錄**；不必等 Garmin 的資料。
+- `scripts/site_round.py`（`update.py` 在 `import_garmin.py` 之後自動跑）：`data/raw/caddie/` 裡有、`data/rounds/` 還沒有同日同球場（或那個檔沒有任何計分卡編號）的，產生 `data/rounds/日期_球場名.csv`：每洞一列、沒有擊球列，`putts_source = manual`，ON、推桿、步數來自網站，計分卡編號空白，多三欄 `site_key`（Garmin 球場代碼_洞號）、`pin_lat`、`pin_lon`。只放記了成績的洞，順序照第一桿（或記成績）的時間。
+- 擊球在合併時（`merge_shots.py`）從網站的原始資料補進來，全部是 `source = site`，距離用網站按下去時的 GPS 算。`round_parts()` 沒有計分卡編號時依分區分組（卡片上才會寫 C／B 而不是前九／後九）。
+- 手錶的資料之後匯入時，`import_garmin.py` 會丟掉計分卡編號空白的列、整份換成手錶的，兩個來源再照原本的規則合併。
+- 這種場次沒有 `data/raw/gps/` 的檔，所以展開後只有「明細」「距離」，沒有「開球」「揮桿圖」，等手錶的資料進來才有。
+- `ingest_caddie.py` 的輸出每洞多存 `st`（第一次記成績的時間），用來排洞的順序。
+- 2026-11-28 南寶 C＋B：104 桿（C 51、B 53），推桿 33（目前最好），三推 4 洞。B5 的成績被記到別洞後無法再記擊球，整洞沒有擊球（手錶的資料進來會補）。
