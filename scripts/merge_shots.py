@@ -90,6 +90,9 @@ def merge_round(fname, rows=None):
     for seq, rs in sorted(by_seq.items()):
         r0 = rs[0]; srows = [r for r in rs if r["shot_no"] and r["shot_type"] != "PUTT"]
         cid, h, g = gps.get((r0["garmin_scorecard_id"], int(r0["hole"])), (None, None, {"pin": None, "shots": []}))
+        if cid is None and r0.get("site_key"):            # 只有網站紀錄的場次（site_round.py）：球場代碼、洞號、旗桿寫在場次檔裡
+            cid, h = r0["site_key"].split("_"); h = int(h)
+            g = {"pin": (float(r0["pin_lat"]), float(r0["pin_lon"])) if r0.get("pin_lat") else None, "shots": []}
         G = []
         gmap = {s["no"]: s for s in g["shots"]}
         for r in srows:

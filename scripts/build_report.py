@@ -512,7 +512,7 @@ def round_parts(fname):
     """這一場每一洞屬於哪一區（組合球場才有意義）。回傳 (每洞區名的 list, 組合名稱如「青山＋綠水」)；不是組合就回傳 (None, "")。"""
     rows = list(csv.DictReader(open(os.path.join(ROOT, "data/rounds", fname), encoding="utf-8-sig")))
     seqs = {}
-    for r in rows: seqs.setdefault(r["garmin_scorecard_id"], {})[int(r["seq"])] = r["layout"]
+    for r in rows: seqs.setdefault(r["garmin_scorecard_id"] or "site:" + r["layout"], {})[int(r["seq"])] = r["layout"]   # 只有網站紀錄的場次沒有計分卡編號，依分區分組
     lab = {}
     for sid, d in seqs.items():
         L = layout_labels(next(iter(d.values()))); ss = sorted(d)

@@ -51,7 +51,7 @@ def main(force):
         if os.path.exists(path) and not force:
             for r in csv.reader(open(path, encoding="utf-8-sig")):                # 場次檔可能有人工加的欄位（手記的 strokes_to_green、first_putt_steps），依欄名找計分卡編號並保留原表頭
                 if r and r[0] in ("date", "\ufeffdate"): head = r; sidx = r.index("garmin_scorecard_id")
-                elif r: keep.setdefault(r[sidx], []).append(r)
+                elif r and r[sidx]: keep.setdefault(r[sidx], []).append(r)          # 只有網站紀錄的列（計分卡編號空白，site_round.py 產生的）：手錶的資料一到就整份換掉
             if all(cards[sid][1] in keep for sid in sids):
                 skipped += 1; continue                    # 沒有新的計分卡 → 不動
             merged += 1                                   # 同日同球場來了新計分卡（例如後九）→ 自動併入
