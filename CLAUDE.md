@@ -1022,3 +1022,4 @@ python3 scripts/build_report.py      # golf.db → reports/index.html（整頁�
 - **記下來**：使用者說「記下來」或「之後再修」，就開一個 GitHub issue；之後修的 PR 說明寫「Fixes #N」，merge 時自動關掉。
 - GitHub Actions 的機器人（空拍照片下載）照舊直接推到 main。main 目前沒有開分支保護，要開的話要讓機器人例外。
 - PR 是用使用者的帳號開的，GitHub 不讓作者自己按 Approve；在對話裡說 merge 就等於審核過。
+- 工具注意：這個環境的 `gh pr create`／`gh pr merge` 走 GraphQL 會被擋（403），改用 REST：開 PR `gh api repos/milai1102/mi_golf_task/pulls -f title=… -f head=分支 -f base=main -f body=…`；合併 `gh api -X PUT repos/milai1102/mi_golf_task/pulls/N/merge -f merge_method=squash`；刪分支 `git push origin --delete 分支`；列出 `gh api repos/milai1102/mi_golf_task/pulls --jq '.[]|[.number,.title]'`。
