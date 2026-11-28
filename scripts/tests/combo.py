@@ -16,14 +16,14 @@ async def main():
             await pg.screenshot(path=o+"0.png")
             await pg.click(".cad-seg .q"); await pg.wait_for_timeout(400); await pg.screenshot(path=o+"1.png")
             # choose 前九 C only, 開始
-            await pg.click('.combo .cbr >> nth=0 >> button:has-text("C")'); await pg.click(".combo .ok.go"); await pg.wait_for_timeout(500)
+            await pg.click('.combo .cbr >> nth=0 >> button:has-text("C")'); await pg.click(".cad-sheet .hd .x"); await pg.wait_for_timeout(500)
             print("1 top:",(await T()).replace("\n"," "))
             # go to hole 9
             for i in range(8): await pg.click(".cad-nb.nx"); await pg.wait_for_timeout(150)
             print("C9 next disabled:", await pg.locator(".cad-nb.nx").is_disabled(), (await pg.locator(".cad-nav").inner_text()).replace("\n"," "))
             await pg.screenshot(path=o+"2.png")
             await pg.click(".cad-course"); await pg.wait_for_timeout(400)
-            await pg.click('.combo .cbr >> nth=1 >> button:has-text("B")'); await pg.screenshot(path=o+"3.png"); await pg.click(".combo .ok.go"); await pg.wait_for_timeout(500)
+            await pg.click('.combo .cbr >> nth=1 >> button:has-text("B")'); await pg.screenshot(path=o+"3.png"); await pg.click(".cad-sheet .hd .x"); await pg.wait_for_timeout(500)
             print("2 top:",(await T()).replace("\n"," "), "hole:",(await pg.locator(".cad-hole").inner_text()).replace("\n",""))
             await pg.click(".cad-nb.nx"); await pg.wait_for_timeout(400)
             print("after next top:",(await T()).replace("\n"," "), "hole:",(await pg.locator(".cad-hole").inner_text()).replace("\n",""))
